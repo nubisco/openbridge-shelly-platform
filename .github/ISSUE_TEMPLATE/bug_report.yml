@@ -1,0 +1,108 @@
+name: Bug report
+description: Report a reproducible problem with the plugin
+labels: [bug]
+assignees: [joseporto]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please provide enough detail for maintainers to reproduce it.
+
+  - type: dropdown
+    id: device_model
+    attributes:
+      label: Shelly model
+      description: Which meter is affected. Check `http://<device-ip>/shelly` if unsure.
+      options:
+        - Shelly 3EM (Gen1, type SHEM-3)
+        - Shelly EM (Gen1, type SHEM)
+        - Shelly Pro 3EM (Gen2+)
+        - Shelly 3EM-63 (Gen3)
+        - unknown / other
+    validations:
+      required: true
+
+  - type: input
+    id: device_firmware
+    attributes:
+      label: Device firmware
+      description: The `fw` field from `http://<device-ip>/shelly`
+      placeholder: 20230913-114244/v1.14.0-gcb84623
+    validations:
+      required: true
+
+  - type: input
+    id: plugin_version
+    attributes:
+      label: Plugin version
+      placeholder: 1.1.2
+    validations:
+      required: true
+
+  - type: input
+    id: openbridge_version
+    attributes:
+      label: Openbridge version
+      placeholder: 1.8.x
+    validations:
+      required: true
+
+  - type: input
+    id: node_version
+    attributes:
+      label: Node.js version
+      placeholder: 20.x or 22.x
+    validations:
+      required: true
+
+  - type: input
+    id: platform_os
+    attributes:
+      label: Platform / OS
+      placeholder: Raspberry Pi OS, Ubuntu, macOS, Docker, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: config_snippet
+    attributes:
+      label: Config snippet (redacted)
+      description: Paste the relevant part of `config.json`. Remove or replace sensitive values (`ip`, `username`, `password`).
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Paste relevant Openbridge logs. Use debug mode (`-D`) when possible.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Configure a device with ip ...
+        2. Restart OpenBridge
+        3. Open the OpenBridge devices view
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

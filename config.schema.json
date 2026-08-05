@@ -1,0 +1,115 @@
+{
+  "pluginAlias": "ShellyPlatform",
+  "pluginType": "platform",
+  "singular": true,
+  "headerDisplay": "Shelly devices over the local network. Energy meters report per-phase power, voltage, current and energy to OpenBridge, with history charting.",
+  "footerDisplay": "Supported today: Shelly 3EM and Shelly EM (Gen1). Gen2+ devices are detected and reported clearly, but not yet polled.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "devices": {
+        "title": "Devices",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "ip": {
+              "title": "IP address",
+              "type": "string",
+              "required": true,
+              "format": "hostname",
+              "description": "IP address or hostname of the Shelly device on your local network."
+            },
+            "name": {
+              "title": "Name",
+              "type": "string",
+              "description": "Prefix for the devices this meter creates, e.g. \"Home\" produces \"Home - Total\" and \"Home - Phase A\"."
+            },
+            "pollInterval": {
+              "title": "Poll interval (seconds)",
+              "type": "integer",
+              "default": 5,
+              "minimum": 1,
+              "maximum": 3600,
+              "description": "How often to read the device. Lower values give finer power resolution at the cost of more network traffic."
+            },
+            "timeout": {
+              "title": "Request timeout (ms)",
+              "type": "integer",
+              "default": 4000,
+              "minimum": 500,
+              "maximum": 60000
+            },
+            "showTotal": {
+              "title": "Show combined total",
+              "type": "boolean",
+              "default": true,
+              "description": "Register one device summing every phase."
+            },
+            "showPhases": {
+              "title": "Show individual phases",
+              "type": "boolean",
+              "default": true,
+              "description": "Register one device per phase."
+            },
+            "phaseNames": {
+              "title": "Phase names",
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Labels for each phase. Defaults to Phase A, Phase B, Phase C."
+            },
+            "exposeToHomeKit": {
+              "title": "Expose to HomeKit",
+              "type": "boolean",
+              "default": true,
+              "description": "Publish each channel as a HomeKit light sensor whose lux value carries watts. HomeKit has no power characteristic, so this is the only way to see a live number in the Home app."
+            },
+            "alertThreshold": {
+              "title": "Alert threshold (watts)",
+              "type": "integer",
+              "default": 0,
+              "minimum": 0,
+              "description": "Adds a HomeKit contact sensor that opens above this power level. 0 disables it."
+            },
+            "username": {
+              "title": "Username (optional)",
+              "type": "string",
+              "description": "Only needed if the device has HTTP authentication enabled."
+            },
+            "password": {
+              "title": "Password (optional)",
+              "type": "string",
+              "description": "Only needed if the device has HTTP authentication enabled."
+            },
+            "exclude": {
+              "title": "Ignore this device",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "layout": [
+    {
+      "key": "devices",
+      "type": "array",
+      "title": "Devices",
+      "buttonText": "Add device",
+      "items": [
+        "devices[].ip",
+        "devices[].name",
+        "devices[].pollInterval",
+        "devices[].showTotal",
+        "devices[].showPhases",
+        "devices[].phaseNames",
+        "devices[].exposeToHomeKit",
+        "devices[].alertThreshold",
+        "devices[].username",
+        "devices[].password",
+        "devices[].exclude"
+      ]
+    }
+  ]
+}
