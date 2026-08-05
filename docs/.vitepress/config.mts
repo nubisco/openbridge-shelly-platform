@@ -35,6 +35,7 @@ export default defineConfig({
 
   themeConfig: {
     siteTitle: 'Shelly Platform',
+    logo: { src: '/logo-mini.svg', width: 24, height: 24 },
     nav: [
       { text: 'Guide', link: '/introduction' },
       { text: 'Configuration', link: '/configuration' },
