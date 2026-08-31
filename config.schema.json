@@ -2,8 +2,8 @@
   "pluginAlias": "ShellyPlatform",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "Shelly devices over the local network. Energy meters report per-phase power, voltage, current and energy to OpenBridge, with history charting.",
-  "footerDisplay": "Supported today: Shelly 3EM and Shelly EM (Gen1). Gen2+ devices are detected and reported clearly, but not yet polled.",
+  "headerDisplay": "Shelly devices over the local network. Energy meters report per-phase power, voltage, current and energy to OpenBridge, with history charting. Gen2+ relays are exposed as switches you can control from OpenBridge and HomeKit.",
+  "footerDisplay": "Supported: Shelly 3EM and EM (Gen1), and Gen2+ devices with relay or energy-meter components (Plus/Pro 1/2/4PM, Pro 3EM). Roller-cover mode is not supported yet.",
   "schema": {
     "type": "object",
     "properties": {
@@ -55,14 +55,16 @@
             "phaseNames": {
               "title": "Phase names",
               "type": "array",
-              "items": { "type": "string" },
+              "items": {
+                "type": "string"
+              },
               "description": "Labels for each phase. Defaults to Phase A, Phase B, Phase C."
             },
             "exposeToHomeKit": {
               "title": "Expose to HomeKit",
               "type": "boolean",
               "default": true,
-              "description": "Publish each channel as a HomeKit light sensor whose lux value carries watts. HomeKit has no power characteristic, so this is the only way to see a live number in the Home app."
+              "description": "Publish this device to HomeKit. Meter channels appear as a light sensor whose lux value carries watts (HomeKit has no power characteristic); relay channels appear as switches. To show a relay as a light or outlet instead, use the device inspector in OpenBridge \u2014 it re-applies the choice on every restart."
             },
             "alertThreshold": {
               "title": "Alert threshold (watts)",
@@ -85,6 +87,78 @@
               "title": "Ignore this device",
               "type": "boolean",
               "default": false
+            },
+            "switch:0": {
+              "title": "Relay channel 0",
+              "type": "object",
+              "description": "Overrides for the switch:0 channel on a Gen2+ relay. Ignored on Gen1 meters.",
+              "properties": {
+                "name": {
+                  "title": "Name",
+                  "type": "string",
+                  "description": "Overrides the generated \"<device> - Switch 0\" name."
+                },
+                "exclude": {
+                  "title": "Ignore this channel",
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Do not register this channel as a device at all."
+                }
+              }
+            },
+            "switch:1": {
+              "title": "Relay channel 1",
+              "type": "object",
+              "description": "Overrides for the switch:1 channel on a Gen2+ relay. Ignored on Gen1 meters.",
+              "properties": {
+                "name": {
+                  "title": "Name",
+                  "type": "string",
+                  "description": "Overrides the generated \"<device> - Switch 1\" name."
+                },
+                "exclude": {
+                  "title": "Ignore this channel",
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Do not register this channel as a device at all."
+                }
+              }
+            },
+            "switch:2": {
+              "title": "Relay channel 2",
+              "type": "object",
+              "description": "Overrides for the switch:2 channel on a Gen2+ relay. Ignored on Gen1 meters.",
+              "properties": {
+                "name": {
+                  "title": "Name",
+                  "type": "string",
+                  "description": "Overrides the generated \"<device> - Switch 2\" name."
+                },
+                "exclude": {
+                  "title": "Ignore this channel",
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Do not register this channel as a device at all."
+                }
+              }
+            },
+            "switch:3": {
+              "title": "Relay channel 3",
+              "type": "object",
+              "description": "Overrides for the switch:3 channel on a Gen2+ relay. Ignored on Gen1 meters.",
+              "properties": {
+                "name": {
+                  "title": "Name",
+                  "type": "string",
+                  "description": "Overrides the generated \"<device> - Switch 3\" name."
+                },
+                "exclude": {
+                  "title": "Ignore this channel",
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Do not register this channel as a device at all."
+                }
+              }
             }
           }
         }
@@ -108,6 +182,14 @@
         "devices[].alertThreshold",
         "devices[].username",
         "devices[].password",
+        "devices[].switch:0.name",
+        "devices[].switch:0.exclude",
+        "devices[].switch:1.name",
+        "devices[].switch:1.exclude",
+        "devices[].switch:2.name",
+        "devices[].switch:2.exclude",
+        "devices[].switch:3.name",
+        "devices[].switch:3.exclude",
         "devices[].exclude"
       ]
     }

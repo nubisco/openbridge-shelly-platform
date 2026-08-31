@@ -105,3 +105,76 @@ export interface PhaseReading {
   /** False when the meter reported this channel as invalid */
   valid: boolean
 }
+
+// ─── Gen2+ (RPC API) ─────────────────────────────────────────────────────────
+//
+// Gen2 devices serve everything under `/rpc/`. `Shelly.GetStatus` returns one
+// object keyed by component id ("switch:0", "em:0", "cover:0") rather than
+// the fixed arrays Gen1 uses, so components are discovered from the keys.
+
+/** A component id parsed out of a `Shelly.GetStatus` key. */
+export interface ShellyComponentId {
+  /** "switch" | "em" | "emdata" | "cover" | anything else the device reports */
+  type: string
+  /** Channel index: the N in "switch:N" */
+  index: number
+  /** The original key, e.g. "switch:0" */
+  key: string
+}
+
+/** One `switch:N` component. Power fields are absent on non-metering relays. */
+export interface ShellySwitchStatus {
+  id: number
+  /** Relay state */
+  output: boolean
+  /** Instantaneous active power in watts (PM models only) */
+  apower?: number
+  voltage?: number
+  current?: number
+  /** Cumulative energy; `total` is in watt-hours */
+  aenergy?: { total: number }
+  /** Present when the device has shut the channel down, e.g. "overpower" */
+  errors?: string[]
+}
+
+/** One `em:N` component: a Gen2 energy meter channel (Pro 3EM and friends). */
+export interface ShellyEmStatus {
+  id: number
+  a_act_power?: number
+  a_voltage?: number
+  a_current?: number
+  b_act_power?: number
+  b_voltage?: number
+  b_current?: number
+  c_act_power?: number
+  c_voltage?: number
+  c_current?: number
+  total_act_power?: number
+  total_current?: number
+}
+
+/** One `emdata:N` component: cumulative counters for the matching `em:N`. */
+export interface ShellyEmDataStatus {
+  id: number
+  /** Watt-hours consumed, per phase */
+  a_total_act_energy?: number
+  b_total_act_energy?: number
+  c_total_act_energy?: number
+  /** Watt-hours returned to the grid, per phase */
+  a_total_act_ret_energy?: number
+  b_total_act_ret_energy?: number
+  c_total_act_ret_energy?: number
+  total_act?: number
+  total_act_ret?: number
+}
+
+/** `Shelly.GetStatus`: an open map, since the components vary by model. */
+export type ShellyGen2Status = Record<string, unknown>
+
+/** Per-channel overrides, keyed by component id ("switch:0"). */
+export interface ShellyChannelConfig {
+  /** Overrides the generated "<device> - Switch N" name */
+  name?: string
+  /** Skip this channel entirely */
+  exclude?: boolean
+}

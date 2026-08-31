@@ -8,8 +8,9 @@
 Shelly devices in [OpenBridge](https://github.com/nubisco/openbridge), read locally over your own
 network. Per-phase power, voltage, current and cumulative energy, with history charting.
 
-> **Supported today:** Shelly 3EM and Shelly EM (Gen1).
-> Gen2+ devices are detected and reported clearly, but not yet polled. See
+> **Supported today:** Shelly 3EM and Shelly EM (Gen1), plus Gen2+ devices built from `switch`
+> or `em` components: Plus/Pro relays and Pro 3EM meters. Relay channels are controllable from
+> OpenBridge and HomeKit. Roller-cover mode is detected and declined. See
 > [Supported Devices](https://docs.nubisco.io/openbridge-shelly-platform/supported-devices).
 
 ## Why

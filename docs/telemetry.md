@@ -12,6 +12,21 @@ Each registered device reports the following keys on every poll.
 | `totalReturnedEnergy` | kWh     | Cumulative energy exported to the grid                                               |
 | `valid`               | boolean | `false` when the meter could not read the channel                                    |
 
+## Relay channels
+
+A `switch:N` channel reports the same fields as a meter, plus its relay state:
+
+| Field                | Unit | Notes                                                     |
+| -------------------- | ---- | --------------------------------------------------------- |
+| `active`             | bool | Relay state. This is what the OpenBridge toggle controls. |
+| `power`              | W    | Zero on non-metering relays.                              |
+| `voltage`            | V    | Zero on non-metering relays.                              |
+| `current`            | A    | Zero on non-metering relays.                              |
+| `totalForwardEnergy` | kWh  | Cumulative, counted by the device itself.                 |
+
+Non-metering relays report zeros rather than omitting the fields, so a channel's telemetry keys
+stay stable and history charts do not develop gaps if you swap hardware.
+
 ## Units
 
 Gen1 devices report cumulative energy in **watt-hours**. OpenBridge energy history is kept in

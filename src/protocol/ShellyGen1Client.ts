@@ -104,9 +104,12 @@ export class ShellyGen1Client {
  */
 export function assertGen1(info: ShellyDeviceInfo, ip: string): void {
   if (info.gen !== undefined && info.gen >= 2) {
+    // Reaching here means the caller picked the wrong client: the plugin
+    // dispatches on `info.gen` and Gen2+ devices are handled by
+    // ShellyGen2Device. Kept as a guard so a mis-wired call fails loudly.
     throw new ShellyProtocolError(
-      `${ip} is a Gen${info.gen} device (model ${info.model ?? 'unknown'}), which speaks the /rpc/ API. ` +
-        `This plugin currently supports Gen1 meters only (type SHEM-3 or SHEM).`,
+      `${ip} is a Gen${info.gen} device (model ${info.model ?? 'unknown'}), which speaks the /rpc/ API — ` +
+        `it must be polled with the Gen2 client, not this one.`,
     )
   }
   if (!info.type) {
