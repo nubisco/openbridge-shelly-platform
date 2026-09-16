@@ -3,8 +3,9 @@
  *
  * VitePress ships a perfectly good white default, which is exactly the problem:
  * it looks like every other VitePress site and nothing like a Nubisco project.
- * This maps --vp-* onto the plugin's palette so the docs read as ours the
- * moment the page paints. See "Documentation sites (VitePress)" in the
+ * This maps --vp-* onto OpenBridge's palette (a blue bridge on a navy ground,
+ * from openbridge/apps/docs/docs/public/logo.svg), because a plugin site should
+ * read as part of the product it plugs into. See "Documentation sites (VitePress)" in the
  * workspace AGENTS.md, and acta/docs for the reference implementation.
  *
  * Written out rather than imported from @nubisco/ui: the docs build checks out
@@ -12,10 +13,10 @@
  */
 
 :root {
-  --plug-accent: #7c3aed;
-  --plug-accent-bright: #a78bfa;
-  --plug-deep: #17121f;
-  --plug-panel: #241a33;
+  --plug-accent: #2f6fed;
+  --plug-accent-bright: #9fc0f0;
+  --plug-deep: #131d36;
+  --plug-panel: #22335e;
 
   --vp-c-brand-1: var(--plug-accent);
   --vp-c-brand-2: var(--plug-accent-bright);
@@ -24,7 +25,7 @@
 
   /* Two tones, light. Paper rather than pure white, so the sidebar, the code
      blocks and the cards have something to lift off. */
-  --vp-c-bg: #f3f2f6;
+  --vp-c-bg: #f2f4f8;
   --vp-c-bg-alt: #ffffff;
   --vp-c-bg-elv: #ffffff;
   --vp-c-bg-soft: #ffffff;
