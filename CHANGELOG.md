@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.3.0...v1.3.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* do not infer gate motion across an interrupted connection ([452fdf8](https://github.com/nubisco/openbridge-shelly-platform/commit/452fdf8dcb79cac40c6b17a483ac6f541ca6288c))
+
 # [1.3.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.2.2...v1.3.0) (2026-09-17)
 
 
