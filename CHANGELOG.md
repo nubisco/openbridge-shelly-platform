@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.1.0...v1.2.0) (2026-09-17)
+
+
+### Features
+
+* expose a step-by-step gate operator as a HomeKit gate ([52a25af](https://github.com/nubisco/openbridge-shelly-platform/commit/52a25af6c69d4c29c5bafdf43220b6f472c26622))
+
 # [1.1.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.0.0...v1.1.0) (2026-08-31)
 
 
