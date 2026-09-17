@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.2.1...v1.2.2) (2026-09-17)
+
+
+### Bug Fixes
+
+* report an unreachable switch without an out-of-spec characteristic ([6f29c61](https://github.com/nubisco/openbridge-shelly-platform/commit/6f29c617866102ec106fb6759af4ce5f61dec273))
+
 ## [1.2.1](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.2.0...v1.2.1) (2026-09-17)
 
 
