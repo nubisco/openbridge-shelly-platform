@@ -12,6 +12,8 @@ let host: string
 let openLimit = false
 let closedLimit = true
 let autoOff = true
+let inputInvert: Record<number, boolean> = { 0: true, 1: true }
+let inputType = 'switch'
 const setCalls: string[] = []
 
 const status = () => ({
@@ -38,6 +40,10 @@ beforeAll(async () => {
     if (url.startsWith('/rpc/Switch.GetConfig')) {
       return json({ id: 0, auto_off: autoOff, auto_off_delay: 0.5 })
     }
+    if (url.startsWith('/rpc/Input.GetConfig')) {
+      const id = Number(new URL(url, 'http://x').searchParams.get('id'))
+      return json({ id, type: inputType, invert: inputInvert[id] ?? false })
+    }
     if (url.startsWith('/rpc/Switch.Set')) {
       setCalls.push(url)
       return json({ was_on: false })
@@ -57,6 +63,8 @@ beforeEach(() => {
   openLimit = false
   closedLimit = true
   autoOff = true
+  inputInvert = { 0: true, 1: true }
+  inputType = 'switch'
   setCalls.length = 0
 })
 
@@ -134,6 +142,28 @@ describe('gate setup', () => {
     // Without it the relay stays closed across the board's step input, and the
     // gate stops answering its own remote.
     expect(log.warn).toHaveBeenCalledWith(expect.stringContaining('auto-off'))
+  })
+
+  it('warns when the two limit inputs disagree about inversion', async () => {
+    // One matched pair of limit switches read two different ways round. The
+    // gate then reports a position it is not in, and every symptom points at
+    // the gate rather than at a checkbox in the Shelly app.
+    inputInvert = { 0: true, 1: false }
+    const { log } = await setupGate()
+
+    expect(log.warn).toHaveBeenCalledWith(expect.stringContaining('invert'))
+  })
+
+  it('says nothing when both limit inputs agree', async () => {
+    const { log } = await setupGate()
+    expect(log.warn).not.toHaveBeenCalledWith(expect.stringContaining('invert'))
+  })
+
+  it('warns when a limit input is not in switch mode', async () => {
+    inputType = 'button'
+    const { log } = await setupGate()
+    // A button reports events, not a level, so the limit is never readable.
+    expect(log.warn).toHaveBeenCalledWith(expect.stringContaining('switch" mode'))
   })
 
   it('refuses a gate whose two limit inputs are the same input', async () => {

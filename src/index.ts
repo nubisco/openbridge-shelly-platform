@@ -28,6 +28,7 @@ import type {
   ShellyEmDataStatus,
   ShellyEmStatus,
   ShellyGateConfig,
+  ShellyInputConfig,
   ShellySwitchStatus,
 } from './types'
 
@@ -626,6 +627,44 @@ export class ShellyGen2Device extends PolledShellyDevice {
       // Not fatal: an older firmware or a locked-down device can refuse this
       // without the pulse itself being any less valid.
       this.log.debug(`${this.config.ip}: could not read switch:${relay} config: ${err}`)
+    }
+
+    // The two limit switches are one matched pair on a shared common, so the
+    // device must read them the same way round. It is perfectly happy not to:
+    // `invert` is per input, and getting it wrong on one of them is silent.
+    //
+    // The result is a gate that reports the opposite of the truth on half its
+    // travel: at rest it looks mid-travel, arriving at one limit looks like
+    // arriving at the other, and both limits read high together at full open,
+    // which this plugin then reports as a wiring fault. Every symptom points
+    // at the gate rather than at a checkbox in the Shelly app, so it is worth
+    // saying plainly at startup.
+    try {
+      const [openConfig, closedConfig] = await Promise.all([
+        this.client.getInputConfig(openInput),
+        this.client.getInputConfig(closedInput),
+      ])
+      if (Boolean(openConfig?.invert) !== Boolean(closedConfig?.invert)) {
+        this.log.warn(
+          `${this.config.ip}: input:${openInput} and input:${closedInput} disagree on "invert" ` +
+            `(${openConfig?.invert} vs ${closedConfig?.invert}). Both limit switches are the same ` +
+            `kind, so both inputs need the same setting, or the gate will report a position it is ` +
+            `not in. Normally-closed limit switches, the usual kind, need invert on.`,
+        )
+      }
+      for (const [index, cfg] of [
+        [openInput, openConfig],
+        [closedInput, closedConfig],
+      ] as Array<[number, ShellyInputConfig | undefined]>) {
+        if (cfg?.type && cfg.type !== 'switch') {
+          this.log.warn(
+            `${this.config.ip}: input:${index} is in "${cfg.type}" mode. A limit switch needs ` +
+              `"switch" mode to report a level rather than an event.`,
+          )
+        }
+      }
+    } catch (err) {
+      this.log.debug(`${this.config.ip}: could not read input config: ${err}`)
     }
 
     const deviceId = `shelly-${mac}-gate`

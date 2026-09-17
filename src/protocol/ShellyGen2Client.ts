@@ -7,6 +7,7 @@ import type {
   ShellyEmDataStatus,
   ShellyEmStatus,
   ShellyGen2Status,
+  ShellyInputConfig,
   ShellyInputStatus,
   ShellySwitchConfig,
   ShellySwitchStatus,
@@ -170,6 +171,11 @@ export class ShellyGen2Client {
   /** `Switch.GetConfig`: used to verify the auto-off a pulse depends on. */
   getSwitchConfig(id: number): Promise<ShellySwitchConfig> {
     return this.call<ShellySwitchConfig>('Switch.GetConfig', { id })
+  }
+
+  /** `Input.GetConfig`: used to check the two limit inputs agree with each other. */
+  getInputConfig(id: number): Promise<ShellyInputConfig> {
+    return this.call<ShellyInputConfig>('Input.GetConfig', { id })
   }
 }
 

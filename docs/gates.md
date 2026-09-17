@@ -58,6 +58,32 @@ Three things have to be true, and none of them can be discovered by the plugin:
 3. **The two inputs are set to `Switch` mode and detached** from the relays, so a limit switch
    closing does not also fire the step relay.
 
+### Both limit inputs must be inverted the same way
+
+The two limit switches are one matched pair on a shared common, so the Shelly has to read
+them the same way round. `invert` is a per-input setting, and getting it wrong on one of
+them is silent: nothing complains, and the gate simply reports the opposite of the truth
+for half its travel.
+
+The symptoms all point at the gate rather than at a checkbox in the app. A closed gate
+reads as mid-travel or open. Arriving at one limit looks like arriving at the other, so a
+gate that has just started opening is reported as closed, and the Home app re-sends the
+command, which steps the board again and stops the gate a foot into its travel. At full
+open both limits read high together, which this plugin reports as a wiring fault and
+HomeKit shows as an obstruction.
+
+**Normally-closed limit switches, the usual kind, need `invert` turned on.** They conduct
+at rest and open at the limit, so "at the limit" is electrically low. Set both inputs the
+same.
+
+The plugin compares the two at startup and says so when they disagree:
+
+```text
+192.168.1.201: input:0 and input:1 disagree on "invert" (true vs false). Both limit
+switches are the same kind, so both inputs need the same setting, or the gate will
+report a position it is not in.
+```
+
 The plugin checks what it can at startup and logs what it finds:
 
 ```text

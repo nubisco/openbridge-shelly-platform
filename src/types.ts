@@ -172,6 +172,15 @@ export interface ShellyInputStatus {
   errors?: string[]
 }
 
+/** The subset of `Input.GetConfig` the gate wiring cares about. */
+export interface ShellyInputConfig {
+  id: number
+  /** "switch", "button", "analog", ... */
+  type?: string
+  /** True when the device reports the electrical level the other way round */
+  invert?: boolean
+}
+
 /** The subset of `Switch.GetConfig` the gate wiring cares about. */
 export interface ShellySwitchConfig {
   id: number
