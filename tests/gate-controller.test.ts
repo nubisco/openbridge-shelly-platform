@@ -271,3 +271,55 @@ describe('GateController: errors', () => {
     expect(pulse).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('GateController: an interrupted connection', () => {
+  it('does not invent motion from a reading taken after a gap', async () => {
+    const { controller } = makeGate()
+    controller.observe(false, true)
+    expect(controller.state).toBe('closed')
+
+    // The device drops off, reboots, and comes back with its inputs still
+    // settling, so the closed limit reads low for a poll or two.
+    controller.markStale()
+    controller.observe(false, false)
+
+    // Without this, "no limit, and it was closed a moment ago" reads as the
+    // gate having just left the closed limit, and a gate nobody touched is
+    // reported as opening.
+    expect(controller.state).not.toBe('opening')
+  })
+
+  it('still follows the gate normally once observation resumes', async () => {
+    const { controller } = makeGate()
+    controller.observe(false, true)
+    controller.markStale()
+    controller.observe(false, true) // back, and genuinely still closed
+    expect(controller.state).toBe('closed')
+
+    // A real departure after that is inferred as usual.
+    controller.observe(false, false)
+    expect(controller.state).toBe('opening')
+  })
+
+  it('adopts a position that changed while the device was away', () => {
+    const { controller } = makeGate()
+    controller.observe(false, true)
+
+    // Opened by its remote during the outage.
+    controller.markStale()
+    controller.observe(true, false)
+    expect(controller.state).toBe('open')
+  })
+
+  it('drops a travel timeout measured from before the gap', async () => {
+    const { controller, logs } = makeGate({ travelTimeMs: 30 })
+    controller.observe(false, true)
+    await controller.setTarget('open')
+    expect(controller.state).toBe('opening')
+
+    controller.markStale()
+    await settle()
+    // The timer would otherwise fire against a stretch of time nobody watched.
+    expect(logs.join(' ')).not.toMatch(/assuming it stopped/)
+  })
+})

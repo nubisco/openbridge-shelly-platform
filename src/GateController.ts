@@ -65,6 +65,11 @@ export class GateController {
   /** Both limits high at once: physically impossible, so the wiring is wrong. */
   private faultValue = false
   private seenFirstReading = false
+  /**
+   * Set when observation has been interrupted, so the next reading is adopted
+   * rather than compared against a stale one.
+   */
+  private stale = false
 
   private readonly travelTimeMs: number
   private readonly pulseGapMs: number
@@ -110,7 +115,15 @@ export class GateController {
       this.options.onLog?.('limit inputs are consistent again')
     }
 
-    const previous = this.stateValue
+    // A reading taken after a gap says where the gate is, not what it did. The
+    // difference matters: the inference below reads "no limit, and it was at
+    // one a moment ago" as the gate having just left it. Across a gap that is
+    // not a moment ago, and a device that dropped off and came back with its
+    // inputs still settling gets reported as a gate that started moving on its
+    // own. That is how a gate sitting closed came to show "Opening" in the
+    // Home app with nobody having touched it.
+    const previous = this.stale ? null : this.stateValue
+    this.stale = false
 
     if (openLimit) {
       this.clearTravelTimer()
@@ -201,6 +214,21 @@ export class GateController {
   async step(): Promise<void> {
     await this.options.pulse()
     this.applyPredictedPulse()
+  }
+
+  /**
+   * Note that observation has lapsed, so the next reading is taken as the truth
+   * rather than as the next frame of a sequence.
+   *
+   * Called when the device stops answering. A gate does not stop being a gate
+   * while its controller is offline, but what happened during the gap is
+   * unknowable, and guessing produces motion that never happened.
+   */
+  markStale(): void {
+    this.stale = true
+    // Whatever it was doing, it is not being watched any more, so a travel
+    // timeout measured from before the gap means nothing.
+    this.clearTravelTimer()
   }
 
   /** Stop the travel timer. Call when the device runner shuts down. */

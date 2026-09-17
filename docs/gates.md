@@ -171,6 +171,18 @@ briefly reports `Stopped` before arriving; too long and a gate halted by a remot
 
 ## When the device cannot be reached
 
+A gate does not stop being a gate while its controller is offline, but what happened
+during the gap is unknowable. So the first reading after an interruption is taken as the
+truth rather than as the next frame of a sequence: a gate that went away closed and came
+back open was opened by someone, and is reported as open, not as having been observed
+opening.
+
+This matters more than it sounds. Direction is normally inferred from a limit having just
+been released, and "just" stops being true across an outage. A device that reboots and
+comes back with its inputs still settling would otherwise be read as a gate that started
+moving on its own, and a gate sitting closed would show as `Opening` in the Home app with
+nobody having touched it.
+
 A gate whose Shelly stops answering is reported to HomeKit by failing the reads,
 which the Home app shows as **No Response**. It is deliberately not reported with a
 `StatusFault` characteristic, the way this plugin's switch and meter accessories do.

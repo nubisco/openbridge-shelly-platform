@@ -834,6 +834,9 @@ export class ShellyGen2Device extends PolledShellyDevice {
       binding.energyAccessory?.setFault()
     }
     this.gate?.accessory?.setFault()
+    // Reading resumes from whatever the gate reports next, rather than being
+    // compared against a state from before the device went away.
+    this.gate?.controller.markStale()
   }
 
   /** Also drop the gate's travel timer, which outlives the poll loop otherwise. */
