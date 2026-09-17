@@ -1,3 +1,10 @@
+## [1.3.2](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.3.1...v1.3.2) (2026-09-17)
+
+
+### Bug Fixes
+
+* stop a second pulse halting a gate that has only just set off ([082517d](https://github.com/nubisco/openbridge-shelly-platform/commit/082517d7b20ba237e0fc63bd957fe741d4747c76))
+
 ## [1.3.1](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.3.0...v1.3.1) (2026-09-17)
 
 
