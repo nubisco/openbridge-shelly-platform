@@ -143,6 +143,17 @@ Set it a few seconds longer than your gate's slowest full travel. Too short and 
 briefly reports `Stopped` before arriving; too long and a gate halted by a remote keeps showing
 `Opening` until the timer runs out.
 
+## When the device cannot be reached
+
+A gate whose Shelly stops answering is reported to HomeKit by failing the reads,
+which the Home app shows as **No Response**. It is deliberately not reported with a
+`StatusFault` characteristic, the way this plugin's switch and meter accessories do.
+
+`StatusFault` is not in the garage door service's required or optional set. hap-nodejs
+will attach it anyway with a warning, and iOS then validates the bridged accessory
+against the spec and drops it: the gate appears in the Home app once and is gone by the
+next refresh. A missing fault channel is a much smaller problem than a missing accessory.
+
 ## Both limits high
 
 Both limit inputs reading high at once is physically impossible: a gate cannot be fully open and

@@ -36,6 +36,9 @@ export class GateAccessory {
   private currentState: GateState = 'closed'
   private targetState: GateTarget = 'closed'
   private obstructed = false
+  /** Set while the device cannot be reached, so reads answer with a HAP error. */
+  private unreachable = false
+  private readonly hap: any
 
   constructor(
     hap: any,
@@ -47,6 +50,7 @@ export class GateAccessory {
   ) {
     this.accessory = new hap.Accessory(displayName, hap.uuid.generate(uuidSeed))
     this.hapCharacteristic = hap.Characteristic
+    this.hap = hap
 
     this.accessory
       .getService(hap.Service.AccessoryInformation)
@@ -59,11 +63,20 @@ export class GateAccessory {
 
     // Served from cache rather than by hitting the device: HomeKit reads these
     // constantly, and the poll loop keeps them fresh.
-    this.service.getCharacteristic(hap.Characteristic.CurrentDoorState).onGet(() => this.currentDoorState())
-    this.service.getCharacteristic(hap.Characteristic.ObstructionDetected).onGet(() => this.obstructed)
+    this.service.getCharacteristic(hap.Characteristic.CurrentDoorState).onGet(() => {
+      this.assertReachable()
+      return this.currentDoorState()
+    })
+    this.service.getCharacteristic(hap.Characteristic.ObstructionDetected).onGet(() => {
+      this.assertReachable()
+      return this.obstructed
+    })
 
     const target = this.service.getCharacteristic(hap.Characteristic.TargetDoorState)
-    target.onGet(() => this.targetDoorState())
+    target.onGet(() => {
+      this.assertReachable()
+      return this.targetDoorState()
+    })
     target.onSet(async (value: unknown) => {
       const next: GateTarget = Number(value) === this.hapCharacteristic.TargetDoorState.OPEN ? 'open' : 'closed'
       await this.onSet(next)
@@ -95,16 +108,41 @@ export class GateAccessory {
     this.service.updateCharacteristic(this.hapCharacteristic.ObstructionDetected, obstructed)
   }
 
-  /** Mark the accessory unreachable so the Home app shows "No Response". */
+  /**
+   * Mark the accessory unreachable so the Home app shows "No Response".
+   *
+   * Signalled by failing the reads rather than by a StatusFault characteristic,
+   * which is what the switch and meter accessories use. StatusFault is not in
+   * the garage door service's required or optional set, and iOS validates a
+   * bridged accessory against the spec: hap-nodejs adds the characteristic with
+   * a warning, and the Home app then drops the whole accessory. It appears once
+   * and is gone by the next refresh, which is a far worse failure than having
+   * no fault channel at all.
+   */
   setFault(): void {
-    this.service.updateCharacteristic(
-      this.hapCharacteristic.StatusFault,
-      this.hapCharacteristic.StatusFault.GENERAL_FAULT,
-    )
+    this.unreachable = true
   }
 
   clearFault(): void {
-    this.service.updateCharacteristic(this.hapCharacteristic.StatusFault, this.hapCharacteristic.StatusFault.NO_FAULT)
+    if (!this.unreachable) return
+    this.unreachable = false
+    // Push the real state back out, since HomeKit has been refusing reads and
+    // has nothing current cached.
+    this.service.updateCharacteristic(this.hapCharacteristic.CurrentDoorState, this.currentDoorState())
+    this.service.updateCharacteristic(this.hapCharacteristic.TargetDoorState, this.targetDoorState())
+    this.service.updateCharacteristic(this.hapCharacteristic.ObstructionDetected, this.obstructed)
+  }
+
+  /** Throw the HAP "cannot reach it" status, which reads as No Response. */
+  private assertReachable(): void {
+    if (!this.unreachable) return
+    const { HapStatusError, HAPStatus } = this.hap
+    // Older hosts may not expose the typed error; a plain throw still surfaces
+    // as a failed read rather than a wrong position, which is the point.
+    if (typeof HapStatusError === 'function' && HAPStatus) {
+      throw new HapStatusError(HAPStatus.SERVICE_COMMUNICATION_FAILURE)
+    }
+    throw new Error('Gate is unreachable')
   }
 
   private currentDoorState(): number {
