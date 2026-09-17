@@ -30,6 +30,7 @@ That is the whole minimum configuration. Everything else has a sensible default.
 | `password`        | string   | none            | Only if the device has HTTP auth enabled.                          |
 | `exclude`         | boolean  | `false`         | Skip this device entirely.                                         |
 | `switch:N`        | object   | none            | Per-channel overrides on a Gen2+ relay. See below.                 |
+| `gate`            | object   | none            | Present this device as a gate. See [Gates](/gates).                |
 
 ## Relay channels (Gen2+)
 
@@ -56,6 +57,22 @@ There is deliberately no `type` option. Relays are always published to HomeKit a
 whether one should appear as a light or an outlet is set in the OpenBridge device inspector,
 which re-applies the choice on every restart. Keeping that in one place is what stops the Home
 app reverting the accessory to a switch.
+
+## Gates
+
+A Gen2+ device with a relay on a gate operator's step input and its limit switches on two inputs
+can be exposed as a gate instead of as bare relays:
+
+```json
+{
+  "ip": "192.168.1.201",
+  "name": "Driveway",
+  "gate": { "switch": 0, "openInput": 0, "closedInput": 1, "travelTime": 25 }
+}
+```
+
+The wiring, the pulse behaviour and why reaching a target sometimes takes more than one pulse are
+all covered in [Gates](/gates).
 
 ## Choosing a poll interval
 

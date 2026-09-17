@@ -24,6 +24,33 @@ export interface ShellyDeviceConfig {
   showPhases?: boolean
   /** Skip this device entirely */
   exclude?: boolean
+  /** Present this device as a gate rather than as bare relays and inputs */
+  gate?: ShellyGateConfig
+}
+
+/**
+ * Wiring description for a step-by-step gate operator driven by a Shelly.
+ *
+ * The plugin cannot discover any of this: which relay is wired to the board's
+ * step input, and which input reads which limit switch, are facts about the
+ * installation. Everything has a default matching the most obvious wiring
+ * (relay 0 steps, input 0 is the open limit, input 1 the closed limit).
+ */
+export interface ShellyGateConfig {
+  /** Friendly name for the gate accessory (default "<device> - Gate") */
+  name?: string
+  /** Relay index wired to the control board's step input (default 0) */
+  switch?: number
+  /** Input index reading high at the fully-open limit (default 0) */
+  openInput?: number
+  /** Input index reading high at the fully-closed limit (default 1) */
+  closedInput?: number
+  /** Seconds a full travel may take before the gate is assumed stopped (default 30) */
+  travelTime?: number
+  /** Milliseconds between the pulses of a multi-pulse sequence (default 1000) */
+  pulseGap?: number
+  /** Treat a low input as "at the limit", for normally-closed sensing (default false) */
+  invertInputs?: boolean
 }
 
 export interface ShellyPlatformConfig {
@@ -135,6 +162,22 @@ export interface ShellySwitchStatus {
   aenergy?: { total: number }
   /** Present when the device has shut the channel down, e.g. "overpower" */
   errors?: string[]
+}
+
+/** One `input:N` component. `state` is the debounced level of a switch input. */
+export interface ShellyInputStatus {
+  id: number
+  /** Null while the input is unconfigured or its type reports no level */
+  state?: boolean | null
+  errors?: string[]
+}
+
+/** The subset of `Switch.GetConfig` the gate wiring cares about. */
+export interface ShellySwitchConfig {
+  id: number
+  /** True when the relay drops out on its own after `auto_off_delay` seconds */
+  auto_off?: boolean
+  auto_off_delay?: number
 }
 
 /** One `em:N` component: a Gen2 energy meter channel (Pro 3EM and friends). */

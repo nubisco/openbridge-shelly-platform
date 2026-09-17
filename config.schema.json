@@ -2,8 +2,8 @@
   "pluginAlias": "ShellyPlatform",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "Shelly devices over the local network. Energy meters report per-phase power, voltage, current and energy to OpenBridge, with history charting. Gen2+ relays are exposed as switches you can control from OpenBridge and HomeKit.",
-  "footerDisplay": "Supported: Shelly 3EM and EM (Gen1), and Gen2+ devices with relay or energy-meter components (Plus/Pro 1/2/4PM, Pro 3EM). Roller-cover mode is not supported yet.",
+  "headerDisplay": "Shelly devices over the local network. Energy meters report per-phase power, voltage, current and energy to OpenBridge, with history charting. Gen2+ relays are exposed as switches you can control from OpenBridge and HomeKit. A relay wired to a step-by-step gate operator, with its limit switches on two inputs, can be exposed as a gate in HomeKit instead.",
+  "footerDisplay": "Supported: Shelly 3EM and EM (Gen1), and Gen2+ devices with relay or energy-meter components (Plus/Pro 1/2/4PM, Pro 3EM, Plus Uni). A Gen2+ device with a relay and two limit inputs can be presented as a gate. Roller-cover mode is not supported yet.",
   "schema": {
     "type": "object",
     "properties": {
@@ -87,6 +87,64 @@
               "title": "Ignore this device",
               "type": "boolean",
               "default": false
+            },
+            "gate": {
+              "title": "Gate",
+              "type": "object",
+              "description": "Present this device as a gate instead of bare relays. For a step-by-step gate operator: one relay wired to the control board's step input, and two inputs tapped off its limit switches. Leave empty for a normal relay device.",
+              "properties": {
+                "name": {
+                  "title": "Name",
+                  "type": "string",
+                  "description": "Overrides the generated \"<device> - Gate\" name."
+                },
+                "switch": {
+                  "title": "Step relay",
+                  "type": "integer",
+                  "default": 0,
+                  "minimum": 0,
+                  "maximum": 7,
+                  "description": "Relay index wired to the control board's step input. Give it an auto-off timer of about 500 ms in the Shelly app so each command is a clean pulse."
+                },
+                "openInput": {
+                  "title": "Open limit input",
+                  "type": "integer",
+                  "default": 0,
+                  "minimum": 0,
+                  "maximum": 7,
+                  "description": "Input index that reads high when the gate is fully open."
+                },
+                "closedInput": {
+                  "title": "Closed limit input",
+                  "type": "integer",
+                  "default": 1,
+                  "minimum": 0,
+                  "maximum": 7,
+                  "description": "Input index that reads high when the gate is fully closed. Must differ from the open limit input."
+                },
+                "travelTime": {
+                  "title": "Travel time (seconds)",
+                  "type": "integer",
+                  "default": 30,
+                  "minimum": 1,
+                  "maximum": 300,
+                  "description": "How long a full open or close may take before the gate is assumed to have stopped. The limit switches cannot tell a stopped gate from a moving one, so this is the only way to notice."
+                },
+                "pulseGap": {
+                  "title": "Pulse gap (ms)",
+                  "type": "integer",
+                  "default": 1000,
+                  "minimum": 100,
+                  "maximum": 10000,
+                  "description": "Pause between pulses when reaching a target needs more than one step. Reversing a moving gate takes two: one to stop it, one to send it back."
+                },
+                "invertInputs": {
+                  "title": "Inverted limit sensing",
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Treat a low input as \"at the limit\". Needed when the limit switches are wired so the input drops rather than rises at the end of travel."
+                }
+              }
             },
             "switch:0": {
               "title": "Relay channel 0",
@@ -182,6 +240,13 @@
         "devices[].alertThreshold",
         "devices[].username",
         "devices[].password",
+        "devices[].gate.name",
+        "devices[].gate.switch",
+        "devices[].gate.openInput",
+        "devices[].gate.closedInput",
+        "devices[].gate.travelTime",
+        "devices[].gate.pulseGap",
+        "devices[].gate.invertInputs",
         "devices[].switch:0.name",
         "devices[].switch:0.exclude",
         "devices[].switch:1.name",

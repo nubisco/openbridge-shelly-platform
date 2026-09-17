@@ -18,6 +18,7 @@ built from `switch` or `em` components works without a code change:
 | ---------- | ----------------------------------------- | ------------------------------------------ |
 | `switch:N` | A switch device, controllable, plus power | Developed against a Shelly Pro 2PM         |
 | `em:N`     | One device per live phase, plus a total   | Pro 3EM and similar; pairs with `emdata:N` |
+| `input:N`  | Nothing on its own; gate limit switches   | See [Gates](/gates)                        |
 | `cover:N`  | Nothing, declined with an explanation     | See [Roller covers](#roller-covers)        |
 
 Relay channels are published to HomeKit as plain **switches**. To have one appear as a light or
@@ -25,6 +26,12 @@ an outlet, set it in the OpenBridge device inspector. OpenBridge re-applies that
 restart, so it survives a bridge restart in a way that re-typing in the Home app does not. The
 plugin deliberately offers no `type` setting of its own, so there is only ever one source of
 truth for that decision.
+
+## Gates
+
+A relay wired to a step-by-step gate operator, with the operator's limit switches tapped onto two
+inputs, is exposed as a single gate device rather than a relay and two sensors. Developed against
+a Shelly Plus Uni on a sliding gate. See [Gates](/gates).
 
 ## The two APIs
 

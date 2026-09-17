@@ -14,6 +14,7 @@ const usingIt = [
     items: [
       { text: 'Configuration', link: '/configuration' },
       { text: 'Supported Devices', link: '/supported-devices' },
+      { text: 'Gates', link: '/gates' },
       { text: 'Examples', link: '/config-example' },
     ],
   },
@@ -51,7 +52,10 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', href: '/openbridge-shelly-platform/favicon.ico' }],
     ['meta', { name: 'theme-color', content: '#22335e' }],
-    ['meta', { name: 'keywords', content: 'openbridge, shelly, 3em, energy, homekit, plugin, smart-home' }],
+    [
+      'meta',
+      { name: 'keywords', content: 'openbridge, shelly, 3em, energy, gate, garage door, homekit, plugin, smart-home' },
+    ],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'OpenBridge Shelly Platform' }],
     [

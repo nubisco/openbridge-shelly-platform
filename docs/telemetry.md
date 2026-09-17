@@ -27,6 +27,21 @@ A `switch:N` channel reports the same fields as a meter, plus its relay state:
 Non-metering relays report zeros rather than omitting the fields, so a channel's telemetry keys
 stay stable and history charts do not develop gaps if you swap hardware.
 
+## Gates
+
+A device configured as a [gate](/gates) reports where the gate is instead of electrical readings:
+
+| Field         | Type   | Notes                                                                    |
+| ------------- | ------ | ------------------------------------------------------------------------ |
+| `state`       | string | `open`, `closed`, `opening`, `closing` or `stopped`                      |
+| `target`      | string | `open` or `closed`: where it was last asked to go                        |
+| `openLimit`   | bool   | The fully-open limit switch, as read                                     |
+| `closedLimit` | bool   | The fully-closed limit switch, as read                                   |
+| `wiringFault` | bool   | `true` when both limits read high, which cannot happen on a working gate |
+
+`stopped` means the gate is between its limits and not believed to be moving, either because a
+pulse halted it or because it did not reach a limit within `travelTime`.
+
 ## Units
 
 Gen1 devices report cumulative energy in **watt-hours**. OpenBridge energy history is kept in

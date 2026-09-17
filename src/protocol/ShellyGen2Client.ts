@@ -7,6 +7,8 @@ import type {
   ShellyEmDataStatus,
   ShellyEmStatus,
   ShellyGen2Status,
+  ShellyInputStatus,
+  ShellySwitchConfig,
   ShellySwitchStatus,
   PhaseReading,
 } from '../types'
@@ -150,6 +152,25 @@ export class ShellyGen2Client {
   async setSwitch(id: number, on: boolean): Promise<void> {
     await this.call('Switch.Set', { id, on })
   }
+
+  /**
+   * Close a relay once and let the device's own auto-off open it again.
+   *
+   * Deliberately one call, not on-then-off. A control board reads the step
+   * input as an edge, so the pulse only has to be clean, and the device timing
+   * it itself means a bridge that dies mid-pulse cannot leave the relay closed
+   * across the board's step input. That is worth more than the convenience of
+   * owning the timing here: a latched step input is a gate that stops
+   * answering its remote.
+   */
+  async pulseSwitch(id: number): Promise<void> {
+    await this.setSwitch(id, true)
+  }
+
+  /** `Switch.GetConfig`: used to verify the auto-off a pulse depends on. */
+  getSwitchConfig(id: number): Promise<ShellySwitchConfig> {
+    return this.call<ShellySwitchConfig>('Switch.GetConfig', { id })
+  }
 }
 
 interface RawResponse {
@@ -206,6 +227,19 @@ export function parseComponents(status: ShellyGen2Status): ShellyComponentId[] {
 /** True when the device is wired as a roller shutter rather than two relays. */
 export function isCoverMode(status: ShellyGen2Status): boolean {
   return parseComponents(status).some((c) => c.type === 'cover')
+}
+
+/**
+ * Read one `input:N` level out of a status payload.
+ *
+ * Returns null rather than false when the input is missing or reports no level,
+ * so a mistyped input index shows up as "unknown" instead of quietly reading as
+ * "not at the limit", which for a gate would mean an invented position.
+ */
+export function readInputState(status: ShellyGen2Status, index: number, invert = false): boolean | null {
+  const input = status[`input:${index}`] as ShellyInputStatus | undefined
+  if (!input || typeof input.state !== 'boolean') return null
+  return invert ? !input.state : input.state
 }
 
 /**

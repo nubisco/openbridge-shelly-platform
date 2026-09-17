@@ -11,12 +11,15 @@ import {
   assertGen2,
   isCoverMode,
   parseComponents,
+  readInputState,
   toEmPhaseReading,
   toEmTotalReading,
   toSwitchReading,
 } from './protocol/ShellyGen2Client'
 import { EnergyAccessory } from './accessories/EnergyAccessory'
 import { SwitchAccessory } from './accessories/SwitchAccessory'
+import { GateAccessory } from './accessories/GateAccessory'
+import { GateController, type GateTarget } from './GateController'
 import type {
   PhaseReading,
   ShellyChannelConfig,
@@ -24,6 +27,7 @@ import type {
   ShellyDeviceInfo,
   ShellyEmDataStatus,
   ShellyEmStatus,
+  ShellyGateConfig,
   ShellySwitchStatus,
 } from './types'
 
@@ -62,6 +66,16 @@ function definePlugin<T extends { manifest: { name: string; version: string } }>
 
 const DEFAULT_PHASE_NAMES = ['Phase A', 'Phase B', 'Phase C']
 
+const ShellyGateConfigSchema = z.object({
+  name: z.string().optional(),
+  switch: z.number().int().min(0).max(7).optional(),
+  openInput: z.number().int().min(0).max(7).optional(),
+  closedInput: z.number().int().min(0).max(7).optional(),
+  travelTime: z.number().min(1).max(300).optional(),
+  pulseGap: z.number().min(100).max(10000).optional(),
+  invertInputs: z.boolean().optional(),
+})
+
 const ShellyDeviceConfigSchema = z
   .object({
     ip: z.string().min(1, 'Device IP or hostname is required'),
@@ -76,6 +90,7 @@ const ShellyDeviceConfigSchema = z
     showTotal: z.boolean().optional(),
     showPhases: z.boolean().optional(),
     exclude: z.boolean().optional(),
+    gate: ShellyGateConfigSchema.optional(),
   })
   // Per-channel overrides keyed by Gen2 component id: "switch:0", "switch:1".
   // Catchall rather than named keys because the channel count varies by model
@@ -333,6 +348,23 @@ interface Gen2Binding {
   energyAccessory: EnergyAccessory | null
 }
 
+/** The gate built on top of one relay and two limit inputs. */
+interface GateBinding {
+  deviceId: string
+  displayName: string
+  controller: GateController
+  accessory: GateAccessory | null
+  openInput: number
+  closedInput: number
+  invert: boolean
+  /** Last limit levels read, so a command can report the same shape a poll does. */
+  openLimitState: boolean | null
+  closedLimitState: boolean | null
+}
+
+/** Defaults for the most obvious gate wiring: relay 0 steps, inputs 0 and 1 sense. */
+const GATE_DEFAULTS = { switch: 0, openInput: 0, closedInput: 1, travelTime: 30, pulseGap: 1000 }
+
 /**
  * Polls one Gen2+ device and fans its components out to OpenBridge devices.
  *
@@ -343,6 +375,7 @@ interface Gen2Binding {
 export class ShellyGen2Device extends PolledShellyDevice {
   private readonly client: ShellyGen2Client
   private readonly bindings: Gen2Binding[] = []
+  private gate: GateBinding | null = null
 
   constructor(config: ShellyDeviceConfig, log: PluginLogger) {
     super(config, log)
@@ -351,6 +384,19 @@ export class ShellyGen2Device extends PolledShellyDevice {
       password: config.password,
       timeout: config.timeout,
     })
+  }
+
+  /**
+   * A gate is polled every second unless told otherwise.
+   *
+   * Position is the one reading a person actually watches change, and the
+   * five-second default would make the Home app tile lag a gate by most of its
+   * travel. Two extra requests a second to a device on the LAN is a fair price
+   * for a tile that tracks the gate.
+   */
+  get pollIntervalMs(): number {
+    if (this.config.gate && this.config.pollInterval === undefined) return 1000
+    return super.pollIntervalMs
   }
 
   /**
@@ -388,10 +434,25 @@ export class ShellyGen2Device extends PolledShellyDevice {
       firmwareRevision: info.fw_id ?? info.fw ?? '1.0.0',
     }
 
+    if (this.config.gate) {
+      await this.setupGate(ctx, hap, bridge, status, mac, baseName, exposeToHomeKit, accessoryOptions)
+    }
+
     for (const component of parseComponents(status)) {
       const channel = this.channelConfig(component.key)
       if (channel?.exclude) {
         this.log.info(`${this.config.ip}: skipping ${component.key} (excluded in config)`)
+        continue
+      }
+
+      // The gate owns its step relay. Exposing it as a switch as well would put
+      // a toggle in HomeKit that pulses the gate behind the gate accessory's
+      // back, leaving the two disagreeing about where it is.
+      if (
+        this.gate &&
+        component.type === 'switch' &&
+        component.index === (this.config.gate?.switch ?? GATE_DEFAULTS.switch)
+      ) {
         continue
       }
 
@@ -503,12 +564,184 @@ export class ShellyGen2Device extends PolledShellyDevice {
     )
   }
 
+  /**
+   * Build the gate on top of one relay and two limit inputs.
+   *
+   * Everything is validated against the status payload the device just
+   * returned, because the wiring is declared by hand and a typo here is a
+   * gate that reports a position it is not in. A missing component is fatal
+   * for the gate only: the rest of the device still comes up.
+   */
+  private async setupGate(
+    ctx: PluginContext,
+    hap: any,
+    bridge: any,
+    status: Record<string, unknown>,
+    mac: string,
+    baseName: string,
+    exposeToHomeKit: boolean,
+    accessoryOptions: { manufacturer: string; model: string; firmwareRevision: string },
+  ): Promise<void> {
+    const gate = this.config.gate as ShellyGateConfig
+    const relay = gate.switch ?? GATE_DEFAULTS.switch
+    const openInput = gate.openInput ?? GATE_DEFAULTS.openInput
+    const closedInput = gate.closedInput ?? GATE_DEFAULTS.closedInput
+
+    if (openInput === closedInput) {
+      this.log.error(
+        `${this.config.ip}: gate openInput and closedInput are both ${openInput}: ` +
+          `they must be different inputs. Skipping the gate.`,
+      )
+      return
+    }
+
+    const missing = [`switch:${relay}`, `input:${openInput}`, `input:${closedInput}`].filter((key) => !status[key])
+    if (missing.length > 0) {
+      this.log.error(
+        `${this.config.ip}: gate needs ${missing.join(', ')}, which this device does not report. ` +
+          `Check the switch/openInput/closedInput indexes. Skipping the gate.`,
+      )
+      return
+    }
+
+    // A pulse is one `Switch.Set on=true` and nothing else, so it is the
+    // device's auto-off that ends it. Without that the relay stays closed
+    // across the board's step input, which on most operators means the gate
+    // stops answering its own remote. Worth one extra call at startup to say
+    // so, rather than letting it be discovered from the driveway.
+    try {
+      const switchConfig = await this.client.getSwitchConfig(relay)
+      if (!switchConfig?.auto_off) {
+        this.log.warn(
+          `${this.config.ip}: switch:${relay} has no auto-off timer. The gate needs one ` +
+            `(around 500 ms) so each command is a clean pulse. Set it in the Shelly app.`,
+        )
+      } else if ((switchConfig.auto_off_delay ?? 0) > 2) {
+        this.log.warn(
+          `${this.config.ip}: switch:${relay} auto-off is ${switchConfig.auto_off_delay}s, which is long ` +
+            `for a step pulse. Around 0.5s is usual.`,
+        )
+      }
+    } catch (err) {
+      // Not fatal: an older firmware or a locked-down device can refuse this
+      // without the pulse itself being any less valid.
+      this.log.debug(`${this.config.ip}: could not read switch:${relay} config: ${err}`)
+    }
+
+    const deviceId = `shelly-${mac}-gate`
+    const displayName = gate.name ?? `${baseName} - Gate`
+
+    const controller = new GateController({
+      travelTimeMs: (gate.travelTime ?? GATE_DEFAULTS.travelTime) * 1000,
+      pulseGapMs: gate.pulseGap ?? GATE_DEFAULTS.pulseGap,
+      pulse: () => this.client.pulseSwitch(relay),
+      onLog: (message) => this.log.info(`${displayName}: ${message}`),
+      onChange: () => {
+        // A command must publish exactly what a poll publishes. Reporting a
+        // narrower object here would make the telemetry shape depend on who
+        // moved the gate, and anything reading it would have to cope with both.
+        this.publishGate(ctx)
+      },
+    })
+
+    ctx.registerDevice({
+      id: deviceId,
+      name: displayName,
+      widgetType: 'gate',
+      manufacturer: 'Shelly',
+      model: accessoryOptions.model,
+    })
+
+    // `target` is the absolute command, the same one HomeKit issues. `step` is
+    // the physical button: the only way to halt a gate mid-travel, which the
+    // HomeKit garage door service has no vocabulary for.
+    ctx.registerControl(deviceId, 'target', async (value: unknown) => {
+      await controller.setTarget(toGateTarget(value))
+    })
+    ctx.registerControl(deviceId, 'step', async () => {
+      await controller.step()
+    })
+
+    let accessory: GateAccessory | null = null
+    if (exposeToHomeKit) {
+      accessory = new GateAccessory(hap, displayName, deviceId, (target) => controller.setTarget(target), {
+        ...accessoryOptions,
+        serialNumber: `${mac}-gate`,
+      })
+      try {
+        bridge.addBridgedAccessory(accessory.accessory)
+      } catch (err) {
+        this.log.warn(`Could not add "${displayName}" to the HomeKit bridge: ${err}`)
+        accessory = null
+      }
+    }
+
+    this.gate = {
+      deviceId,
+      displayName,
+      controller,
+      accessory,
+      openInput,
+      closedInput,
+      invert: gate.invertInputs === true,
+      openLimitState: null,
+      closedLimitState: null,
+    }
+
+    this.log.info(
+      `${this.config.ip}: gate "${displayName}" on switch:${relay}, ` +
+        `open limit input:${openInput}, closed limit input:${closedInput}`,
+    )
+  }
+
+  /** Feed the limit inputs to the gate state machine and report where it is. */
+  private readGate(ctx: PluginContext, status: Record<string, unknown>): void {
+    const gate = this.gate
+    if (!gate) return
+
+    const openLimit = readInputState(status, gate.openInput, gate.invert)
+    const closedLimit = readInputState(status, gate.closedInput, gate.invert)
+    if (openLimit === null || closedLimit === null) {
+      // The inputs vanished from the payload, which means the device was
+      // reconfigured under us. Say nothing about the position rather than
+      // inventing one.
+      gate.accessory?.setFault()
+      return
+    }
+
+    // Recorded before observing, so the change this reading causes is published
+    // against the reading that caused it.
+    gate.openLimitState = openLimit
+    gate.closedLimitState = closedLimit
+
+    gate.controller.observe(openLimit, closedLimit)
+    gate.accessory?.setObstructed(gate.controller.fault)
+    gate.accessory?.clearFault()
+    this.publishGate(ctx)
+  }
+
+  /** Report the gate's full state, whoever caused the change. */
+  private publishGate(ctx: PluginContext): void {
+    const gate = this.gate
+    if (!gate) return
+
+    gate.accessory?.update(gate.controller.state, gate.controller.target)
+    ctx.reportTelemetry(gate.deviceId, {
+      state: gate.controller.state,
+      target: gate.controller.target,
+      openLimit: gate.openLimitState,
+      closedLimit: gate.closedLimitState,
+      wiringFault: gate.controller.fault,
+    })
+  }
+
   private channelConfig(key: string): ShellyChannelConfig | undefined {
     return (this.config as unknown as Record<string, ShellyChannelConfig | undefined>)[key]
   }
 
   protected async readOnce(ctx: PluginContext): Promise<void> {
     const status = await this.client.getStatus()
+    this.readGate(ctx, status)
 
     for (const binding of this.bindings) {
       if (binding.kind === 'switch') {
@@ -561,11 +794,32 @@ export class ShellyGen2Device extends PolledShellyDevice {
       binding.switchAccessory?.setFault()
       binding.energyAccessory?.setFault()
     }
+    this.gate?.accessory?.setFault()
+  }
+
+  /** Also drop the gate's travel timer, which outlives the poll loop otherwise. */
+  stop(): void {
+    super.stop()
+    this.gate?.controller.dispose()
   }
 
   get deviceIds(): string[] {
-    return this.bindings.map((b) => b.deviceId)
+    const ids = this.bindings.map((b) => b.deviceId)
+    if (this.gate) ids.push(this.gate.deviceId)
+    return ids
   }
+}
+
+/**
+ * Read a gate target off a control value.
+ *
+ * The UI and the HTTP API both send this, and neither agrees on a shape: a
+ * toggle sends a boolean, a select sends a string. Anything unrecognised means
+ * closed, which is the safe direction to fall back to for a gate.
+ */
+function toGateTarget(value: unknown): GateTarget {
+  if (typeof value === 'string') return value.toLowerCase() === 'open' ? 'open' : 'closed'
+  return value === true ? 'open' : 'closed'
 }
 
 // ---- Native OpenBridge plugin ----
