@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.2.0...v1.2.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* stop iOS dropping the gate over an out-of-spec characteristic ([d4df198](https://github.com/nubisco/openbridge-shelly-platform/commit/d4df198ce4508923b55e5f7204f442606d81a803))
+
 # [1.2.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.1.0...v1.2.0) (2026-09-17)
 
 
