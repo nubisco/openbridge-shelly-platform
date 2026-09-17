@@ -2,3 +2,7 @@ dist/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 node_modules/
+
+# Written by semantic-release, in its own markdown style. Checking it means
+# every release commit fails the format gate on the next developer's push.
+CHANGELOG.md
