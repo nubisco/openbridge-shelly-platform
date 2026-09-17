@@ -131,6 +131,25 @@ That last row is the hardware, not the plugin. A board parked mid-cycle always r
 opposite direction, so asking it to carry on the way it was going costs a full reversal. The gate
 visibly moves the wrong way for a moment. There is no way around it from software.
 
+### A gate does not leave its limit switch instantly
+
+A limit switch releases when the gate has physically moved off it, a second or two after
+the motor starts. For that moment the gate is moving and the limits still report it
+parked, and believing that reading turns a running gate back into a stationary one.
+
+This matters because the sequence above re-reads the position between pulses, so it can
+honour a change of mind. Without allowing for the delay the gate sets off, the next poll
+reports it still sitting on the limit it just left, the sequence decides it never started
+and pulses again, and on this hardware the second pulse means stop. The gate travels a
+foot and halts.
+
+So a reading that puts the gate on the limit it was told to leave is ignored for
+`departureSettle` (default 4 seconds). Arrival at the limit it is travelling _towards_ is
+believed at once, and once the window passes the reading is believed again, because a gate
+still on its limit by then genuinely never moved.
+
+Raise it for a slow or heavy gate.
+
 Pulses in a sequence are separated by `pulseGap` (default one second), because a board will
 ignore a second edge arriving too soon after the first. Sequences are capped at three pulses, so
 a gate that is not responding gets stopped rather than cycled back and forth forever.
@@ -204,15 +223,16 @@ trusted.
 
 ## Options
 
-| Option         | Type    | Default | Description                                                            |
-| -------------- | ------- | ------- | ---------------------------------------------------------------------- |
-| `name`         | string  | derived | Replaces the generated `"<device> - Gate"` name.                       |
-| `switch`       | number  | `0`     | Relay index wired to the operator's step input.                        |
-| `openInput`    | number  | `0`     | Input index reading high at the fully-open limit.                      |
-| `closedInput`  | number  | `1`     | Input index reading high at the fully-closed limit. Must differ.       |
-| `travelTime`   | number  | `30`    | Seconds before a gate that has not reached a limit is assumed stopped. |
-| `pulseGap`     | number  | `1000`  | Milliseconds between pulses in a multi-pulse sequence.                 |
-| `invertInputs` | boolean | `false` | Treat a **low** input as "at the limit", for inverted sensing.         |
+| Option            | Type    | Default | Description                                                            |
+| ----------------- | ------- | ------- | ---------------------------------------------------------------------- |
+| `name`            | string  | derived | Replaces the generated `"<device> - Gate"` name.                       |
+| `switch`          | number  | `0`     | Relay index wired to the operator's step input.                        |
+| `openInput`       | number  | `0`     | Input index reading high at the fully-open limit.                      |
+| `closedInput`     | number  | `1`     | Input index reading high at the fully-closed limit. Must differ.       |
+| `travelTime`      | number  | `30`    | Seconds before a gate that has not reached a limit is assumed stopped. |
+| `pulseGap`        | number  | `1000`  | Milliseconds between pulses in a multi-pulse sequence.                 |
+| `departureSettle` | number  | `4000`  | Milliseconds the gate may still press the limit it was told to leave.  |
+| `invertInputs`    | boolean | `false` | Treat a **low** input as "at the limit", for inverted sensing.         |
 
 The relay named in `switch` is not also exposed as a switch. A toggle that pulses the gate behind
 the gate accessory's back would leave the two disagreeing about where it is. Other relays on the
