@@ -74,6 +74,7 @@ const ShellyGateConfigSchema = z.object({
   closedInput: z.number().int().min(0).max(7).optional(),
   travelTime: z.number().min(1).max(300).optional(),
   pulseGap: z.number().min(100).max(10000).optional(),
+  departureSettle: z.number().min(0).max(30000).optional(),
   invertInputs: z.boolean().optional(),
 })
 
@@ -673,6 +674,7 @@ export class ShellyGen2Device extends PolledShellyDevice {
     const controller = new GateController({
       travelTimeMs: (gate.travelTime ?? GATE_DEFAULTS.travelTime) * 1000,
       pulseGapMs: gate.pulseGap ?? GATE_DEFAULTS.pulseGap,
+      settleMs: gate.departureSettle,
       pulse: () => this.client.pulseSwitch(relay),
       onLog: (message) => this.log.info(`${displayName}: ${message}`),
       onChange: () => {

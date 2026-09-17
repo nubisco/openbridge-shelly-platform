@@ -143,6 +143,14 @@
                   "type": "boolean",
                   "default": false,
                   "description": "Treat a low input as \"at the limit\". Needed when the limit switches are wired so the input drops rather than rises at the end of travel."
+                },
+                "departureSettle": {
+                  "title": "Departure settle (ms)",
+                  "type": "integer",
+                  "default": 4000,
+                  "minimum": 0,
+                  "maximum": 30000,
+                  "description": "How long the gate may still be pressing the limit switch it was told to leave before that reading is believed again. A gate sits on its limit for a second or two after the motor starts; reading that as \"still parked\" makes the plugin think it never set off. Raise it for a slow or heavy gate."
                 }
               }
             },
@@ -246,6 +254,7 @@
         "devices[].gate.closedInput",
         "devices[].gate.travelTime",
         "devices[].gate.pulseGap",
+        "devices[].gate.departureSettle",
         "devices[].gate.invertInputs",
         "devices[].switch:0.name",
         "devices[].switch:0.exclude",

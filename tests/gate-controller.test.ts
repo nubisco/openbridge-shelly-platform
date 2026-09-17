@@ -6,13 +6,14 @@ import { GateController, type GateState } from '../src/GateController'
  * faked: the pulse sequencing is the thing under test and mocking the clock out
  * of it would only test the mock.
  */
-function makeGate(overrides: { travelTimeMs?: number; pulseGapMs?: number } = {}) {
+function makeGate(overrides: { travelTimeMs?: number; pulseGapMs?: number; settleMs?: number } = {}) {
   const pulses: number[] = []
   const changes: Array<[GateState, string]> = []
   const logs: string[] = []
   const controller = new GateController({
     travelTimeMs: overrides.travelTimeMs ?? 200,
     pulseGapMs: overrides.pulseGapMs ?? 2,
+    settleMs: overrides.settleMs ?? 4000,
     pulse: async () => {
       pulses.push(pulses.length)
     },
@@ -321,5 +322,76 @@ describe('GateController: an interrupted connection', () => {
     await settle()
     // The timer would otherwise fire against a stretch of time nobody watched.
     expect(logs.join(' ')).not.toMatch(/assuming it stopped/)
+  })
+})
+
+describe('GateController: a gate still sitting on the limit it is leaving', () => {
+  it('sends one pulse to close an open gate, even while the limit still reads', async () => {
+    // Reproduces a real failure. The gate reached fully open, close was
+    // pressed, and it set off and stopped again about ten centimetres later.
+    const { controller, pulses } = makeGate({ pulseGapMs: 30 })
+    controller.observe(true, false)
+    expect(controller.state).toBe('open')
+
+    const closing = controller.setTarget('closed')
+    // The poll runs every second and the switch takes a moment to release, so
+    // it reports the gate still parked open while it is in fact moving.
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    controller.observe(true, false)
+    await closing
+
+    // A second pulse here means stop on this hardware, which is exactly what
+    // the gate did.
+    expect(pulses).toHaveLength(1)
+    expect(controller.state).toBe('closing')
+  })
+
+  it('sends one pulse to open a closed gate while the closed limit still reads', async () => {
+    const { controller, pulses } = makeGate({ pulseGapMs: 30 })
+    controller.observe(false, true)
+
+    const opening = controller.setTarget('open')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    controller.observe(false, true)
+    await opening
+
+    expect(pulses).toHaveLength(1)
+    expect(controller.state).toBe('opening')
+  })
+
+  it('still accepts arrival at the limit it is travelling towards', async () => {
+    const { controller } = makeGate({ pulseGapMs: 30 })
+    controller.observe(false, true)
+    await controller.setTarget('open')
+    expect(controller.state).toBe('opening')
+
+    // Arriving is not a departure reading and must be believed at once.
+    controller.observe(true, false)
+    expect(controller.state).toBe('open')
+  })
+
+  it('believes the limit again once the gate has plainly not moved', async () => {
+    const { controller } = makeGate({ pulseGapMs: 5, settleMs: 40 })
+    controller.observe(true, false)
+    await controller.setTarget('closed')
+    expect(controller.state).toBe('closing')
+
+    // Past the settle window the gate is still sitting on the open limit, so
+    // it never moved, and pretending otherwise helps nobody.
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    controller.observe(true, false)
+    expect(controller.state).toBe('open')
+  })
+
+  it('does not hold the window open across a stop', async () => {
+    const { controller } = makeGate({ pulseGapMs: 30 })
+    controller.observe(true, false)
+    await controller.setTarget('closed')
+    await controller.step() // stop it again immediately
+    expect(controller.state).toBe('stopped')
+
+    // Stopped is not travelling, so nothing is being left behind.
+    controller.observe(true, false)
+    expect(controller.state).toBe('open')
   })
 })

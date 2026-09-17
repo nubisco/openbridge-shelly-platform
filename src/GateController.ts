@@ -35,6 +35,11 @@ export interface GateControllerOptions {
   travelTimeMs?: number
   /** Pause between the pulses of a multi-pulse sequence, in milliseconds. */
   pulseGapMs?: number
+  /**
+   * How long a gate may still be pressing the limit switch it was told to
+   * leave, in milliseconds. See {@link DEFAULT_DEPARTURE_SETTLE_MS}.
+   */
+  settleMs?: number
   /** Fires one step pulse. Rejections abort the sequence and propagate. */
   pulse: () => Promise<void>
   /** Called whenever the observable state changes. */
@@ -50,6 +55,21 @@ export interface GateControllerOptions {
  */
 const MAX_PULSES = 3
 
+/**
+ * How long a gate may still be pressing the limit switch it was told to leave.
+ *
+ * A limit switch releases when the gate has physically moved off it, a second
+ * or two after the motor starts, so there is a window where the gate is moving
+ * and the limits still report it parked. Believing that window turns a running
+ * gate back into a stationary one, and anything deciding what to do next then
+ * decides it has not started.
+ *
+ * Four seconds suits a sliding gate on a mains operator. A slow or heavy gate
+ * that takes longer to come off its limit needs more, which is what the
+ * `departureSettle` option is for.
+ */
+const DEFAULT_DEPARTURE_SETTLE_MS = 4000
+
 export class GateController {
   private stateValue: GateState = 'stopped'
   private targetValue: GateTarget = 'closed'
@@ -61,6 +81,8 @@ export class GateController {
   private lastDirection: GateTarget | null = null
   /** True while a pulse sequence is running, so polls cannot start a second one. */
   private sequenceRunning = false
+  /** When travel was last commanded, for {@link DEPARTURE_SETTLE_MS}. */
+  private motionStartedAt = 0
   private travelTimer: ReturnType<typeof setTimeout> | null = null
   /** Both limits high at once: physically impossible, so the wiring is wrong. */
   private faultValue = false
@@ -73,10 +95,12 @@ export class GateController {
 
   private readonly travelTimeMs: number
   private readonly pulseGapMs: number
+  private readonly settleMs: number
 
   constructor(private readonly options: GateControllerOptions) {
     this.travelTimeMs = options.travelTimeMs ?? 30_000
     this.pulseGapMs = options.pulseGapMs ?? 1000
+    this.settleMs = options.settleMs ?? DEFAULT_DEPARTURE_SETTLE_MS
   }
 
   get state(): GateState {
@@ -124,6 +148,16 @@ export class GateController {
     // Home app with nobody having touched it.
     const previous = this.stale ? null : this.stateValue
     this.stale = false
+
+    // A gate that has just been told to move is still on the limit it is
+    // leaving, and will be for a moment. Reading that as "it is parked there"
+    // undoes the state the pulse just established, and the sequence driving it
+    // then sees a gate that has not started and pulses again. On this hardware
+    // a second pulse means stop, so the gate sets off and halts a foot later.
+    if (Date.now() - this.motionStartedAt < this.settleMs) {
+      if (this.stateValue === 'opening' && closedLimit) return
+      if (this.stateValue === 'closing' && openLimit) return
+    }
 
     if (openLimit) {
       this.clearTravelTimer()
@@ -267,15 +301,18 @@ export class GateController {
     switch (this.predictedPulse()) {
       case 'open':
         this.lastDirection = 'open'
+        this.motionStartedAt = Date.now()
         this.startTravelTimer()
         this.transition('opening')
         return
       case 'close':
         this.lastDirection = 'closed'
+        this.motionStartedAt = Date.now()
         this.startTravelTimer()
         this.transition('closing')
         return
       case 'stop':
+        this.motionStartedAt = 0
         this.clearTravelTimer()
         this.transition('stopped')
     }

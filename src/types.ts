@@ -49,6 +49,11 @@ export interface ShellyGateConfig {
   travelTime?: number
   /** Milliseconds between the pulses of a multi-pulse sequence (default 1000) */
   pulseGap?: number
+  /**
+   * Milliseconds a gate may still be pressing the limit switch it was told to
+   * leave, before that reading is believed again (default 4000)
+   */
+  departureSettle?: number
   /** Treat a low input as "at the limit", for normally-closed sensing (default false) */
   invertInputs?: boolean
 }
