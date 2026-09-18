@@ -1,3 +1,10 @@
+## [1.3.3](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.3.2...v1.3.3) (2026-09-18)
+
+
+### Bug Fixes
+
+* never pulse a gate that cannot be read, and log the ones we do ([e7d1325](https://github.com/nubisco/openbridge-shelly-platform/commit/e7d1325c8517b9d10eb4b152d865fc06a220253b))
+
 ## [1.3.2](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.3.1...v1.3.2) (2026-09-17)
 
 

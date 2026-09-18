@@ -1,6 +1,6 @@
 {
   "name": "@nubisco/openbridge-shelly-platform",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "OpenBridge plugin for Shelly devices over the local network — energy meters, switches and more, with per-phase telemetry and history",
   "repository": {
     "type": "git",
