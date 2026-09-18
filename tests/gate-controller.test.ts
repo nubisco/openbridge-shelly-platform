@@ -395,3 +395,64 @@ describe('GateController: a gate still sitting on the limit it is leaving', () =
     expect(controller.state).toBe('open')
   })
 })
+
+describe('GateController: a pulse that fails', () => {
+  it('stops claiming to know where the gate is', async () => {
+    // A request that times out has very often arrived and been acted on: the
+    // reply is what went missing. Reporting the old position then describes a
+    // gate that may have left it.
+    let fail = true
+    const changes: Array<[GateState, string]> = []
+    const controller = new GateController({
+      pulseGapMs: 2,
+      travelTimeMs: 500,
+      pulse: async () => {
+        if (fail) throw new Error('timed out')
+      },
+      onChange: (state, target) => changes.push([state, target]),
+    })
+    controller.observe(false, true)
+    expect(controller.state).toBe('closed')
+
+    await expect(controller.setTarget('open')).rejects.toThrow('timed out')
+
+    // The position is now unknown, so the next reading is adopted rather than
+    // compared against "closed".
+    fail = false
+    controller.observe(false, false)
+    expect(controller.state).not.toBe('opening')
+  })
+
+  it('says so, so an incident can be read back from the log', async () => {
+    const logs: string[] = []
+    const controller = new GateController({
+      pulseGapMs: 2,
+      pulse: async () => {
+        throw new Error('timed out')
+      },
+      onLog: (m) => logs.push(m),
+    })
+    controller.observe(false, true)
+    await expect(controller.setTarget('open')).rejects.toThrow()
+    expect(logs.join(' ')).toMatch(/may or may not have moved/)
+  })
+
+  it('does not leave the sequence latched, so later commands still work', async () => {
+    let fail = true
+    const pulses: number[] = []
+    const controller = new GateController({
+      pulseGapMs: 2,
+      pulse: async () => {
+        if (fail) throw new Error('timed out')
+        pulses.push(1)
+      },
+    })
+    controller.observe(false, true)
+    await expect(controller.setTarget('open')).rejects.toThrow()
+
+    fail = false
+    controller.observe(false, true)
+    await controller.setTarget('open')
+    expect(pulses).toHaveLength(1)
+  })
+})

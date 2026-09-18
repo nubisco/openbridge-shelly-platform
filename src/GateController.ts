@@ -230,7 +230,7 @@ export class GateController {
           return
         }
 
-        await this.options.pulse()
+        await this.pulseOrForgetPosition()
         this.applyPredictedPulse()
         sent++
       }
@@ -246,8 +246,31 @@ export class GateController {
    * stop, so this is the only way to halt a gate mid-travel from software.
    */
   async step(): Promise<void> {
-    await this.options.pulse()
+    await this.pulseOrForgetPosition()
     this.applyPredictedPulse()
+  }
+
+  /**
+   * Fire one pulse, and stop claiming to know where the gate is if it fails.
+   *
+   * A pulse that fails is not a pulse that did not happen. The command travels
+   * over HTTP to a device on wifi, and a request that times out has very often
+   * arrived and been acted on: the reply is what went missing. Treating that as
+   * "nothing moved" leaves the plugin reporting a position the gate has since
+   * left, and the next command is then computed from a lie.
+   *
+   * So a failure marks the position unknown, the same way a gap in observation
+   * does, and the next reading is adopted as the truth rather than compared
+   * against what we thought before.
+   */
+  private async pulseOrForgetPosition(): Promise<void> {
+    try {
+      await this.options.pulse()
+    } catch (err) {
+      this.markStale()
+      this.options.onLog?.('a pulse failed, so the gate may or may not have moved: position is now unknown')
+      throw err
+    }
   }
 
   /**

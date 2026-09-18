@@ -362,6 +362,8 @@ interface GateBinding {
   /** Last limit levels read, so a command can report the same shape a poll does. */
   openLimitState: boolean | null
   closedLimitState: boolean | null
+  /** Set while the device is not answering, so we do not pulse into the dark. */
+  unreachable: boolean
 }
 
 /** Defaults for the most obvious gate wiring: relay 0 steps, inputs 0 and 1 sense. */
@@ -675,7 +677,23 @@ export class ShellyGen2Device extends PolledShellyDevice {
       travelTimeMs: (gate.travelTime ?? GATE_DEFAULTS.travelTime) * 1000,
       pulseGapMs: gate.pulseGap ?? GATE_DEFAULTS.pulseGap,
       settleMs: gate.departureSettle,
-      pulse: () => this.client.pulseSwitch(relay),
+      pulse: async () => {
+        // A pulse moves a heavy gate, so refusing one is safer than sending it
+        // hopefully. A request to an unresponsive device is not a no-op: it can
+        // arrive and be acted on while the reply is lost, which moves the gate
+        // with nobody able to see that it did.
+        if (this.gate?.unreachable) {
+          throw new ShellyProtocolError(
+            `${this.config.ip} is not answering, so the gate was not pulsed. ` +
+              `Commanding a gate that cannot be read risks moving it unseen.`,
+          )
+        }
+        // Always logged. This is the one thing in the plugin that moves
+        // something physical, and without a record of it an incident cannot be
+        // told apart from someone using the remote.
+        this.log.info(`${displayName}: pulsing switch:${relay}`)
+        await this.client.pulseSwitch(relay)
+      },
       onLog: (message) => this.log.info(`${displayName}: ${message}`),
       onChange: () => {
         // A command must publish exactly what a poll publishes. Reporting a
@@ -727,6 +745,7 @@ export class ShellyGen2Device extends PolledShellyDevice {
       invert: gate.invertInputs === true,
       openLimitState: null,
       closedLimitState: null,
+      unreachable: false,
     }
 
     this.log.info(
@@ -750,6 +769,7 @@ export class ShellyGen2Device extends PolledShellyDevice {
       return
     }
 
+    gate.unreachable = false
     // Recorded before observing, so the change this reading causes is published
     // against the reading that caused it.
     gate.openLimitState = openLimit
@@ -836,6 +856,7 @@ export class ShellyGen2Device extends PolledShellyDevice {
       binding.energyAccessory?.setFault()
     }
     this.gate?.accessory?.setFault()
+    if (this.gate) this.gate.unreachable = true
     // Reading resumes from whatever the gate reports next, rather than being
     // compared against a state from before the device went away.
     this.gate?.controller.markStale()

@@ -188,6 +188,27 @@ Set it a few seconds longer than your gate's slowest full travel. Too short and 
 briefly reports `Stopped` before arriving; too long and a gate halted by a remote keeps showing
 `Opening` until the timer runs out.
 
+## Powering the Shelly
+
+**Give the Shelly its own supply. Do not run it from the operator's accessory rail.**
+
+Those auxiliary outputs are sized for a pair of photocells, and a wifi device's transmit
+peaks are a different kind of load. Borrowing that rail has a specific failure mode, seen
+on a real installation, and it takes the gate out entirely:
+
+1. A pulse energises the relay coil, which is a current spike on the shared rail.
+2. The Shelly browns out mid-pulse, before its own auto-off has fired.
+3. The relay stays closed, holding the operator's step input down.
+4. The operator ignores its own remote, because the step input never releases.
+5. Nothing can command the relay back off, because the Shelly is wedged, and the stuck
+   coil is part of what is holding the rail down.
+
+It does not recover on its own. Only cutting power to the whole assembly releases the
+relay, and until someone does, neither the app nor the handset opens the gate.
+
+A separate supply breaks the loop at step 2, which is the only step under your control.
+Everything else here is mitigation.
+
 ## When the device cannot be reached
 
 A gate does not stop being a gate while its controller is offline, but what happened
@@ -201,6 +222,16 @@ been released, and "just" stops being true across an outage. A device that reboo
 comes back with its inputs still settling would otherwise be read as a gate that started
 moving on its own, and a gate sitting closed would show as `Opening` in the Home app with
 nobody having touched it.
+
+A gate whose Shelly is not answering is never pulsed. A request to an unresponsive device
+is not a no-op: it can arrive and be acted on while only the reply goes missing, which
+moves a heavy gate with nobody able to see that it did. Refusing the command is the safer
+half of that trade.
+
+For the same reason, a pulse that fails leaves the position **unknown** rather than
+unchanged, and the next reading is adopted as the truth. And every pulse is logged, with
+what asked for it, because it is the one thing here that moves something physical and an
+incident cannot otherwise be told apart from someone using the remote.
 
 A gate whose Shelly stops answering is reported to HomeKit by failing the reads,
 which the Home app shows as **No Response**. It is deliberately not reported with a
