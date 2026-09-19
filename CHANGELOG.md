@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.3.3...v1.4.0) (2026-09-19)
+
+
+### Features
+
+* open a step relay that has stayed closed ([14df40c](https://github.com/nubisco/openbridge-shelly-platform/commit/14df40c86e13ee68318ab6f4347fc1a93f106404))
+
 ## [1.3.3](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.3.2...v1.3.3) (2026-09-18)
 
 
