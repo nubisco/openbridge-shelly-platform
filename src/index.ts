@@ -364,6 +364,10 @@ interface GateBinding {
   closedLimitState: boolean | null
   /** Set while the device is not answering, so we do not pulse into the dark. */
   unreachable: boolean
+  /** Relay index, for the latch check. */
+  relay: number
+  /** Consecutive polls that have seen the step relay closed. */
+  relayHeldPolls: number
 }
 
 /** Defaults for the most obvious gate wiring: relay 0 steps, inputs 0 and 1 sense. */
@@ -746,6 +750,8 @@ export class ShellyGen2Device extends PolledShellyDevice {
       openLimitState: null,
       closedLimitState: null,
       unreachable: false,
+      relay,
+      relayHeldPolls: 0,
     }
 
     this.log.info(
@@ -779,6 +785,50 @@ export class ShellyGen2Device extends PolledShellyDevice {
     gate.accessory?.setObstructed(gate.controller.fault)
     gate.accessory?.clearFault()
     this.publishGate(ctx)
+    this.releaseLatchedRelay(status, gate)
+  }
+
+  /**
+   * Open the step relay if it has stayed closed.
+   *
+   * A pulse is half a second and the device's own auto-off ends it, so the
+   * relay should never be closed on two polls a second apart. When it is, that
+   * timer did not run, and the relay is now holding the operator's step input
+   * down. An operator with a held step input ignores its own handset, so this
+   * is the state where nobody can open the gate, by app or by remote.
+   *
+   * It is worth trying to clear even though the usual cause also tends to take
+   * the device offline: the sag that stops the timer may leave the device just
+   * responsive enough to answer this, and clearing it here saves someone
+   * walking out to cut the power. When the device has already gone, this
+   * simply cannot run, which is why the real fix is a supply of its own.
+   */
+  private releaseLatchedRelay(status: Record<string, unknown>, gate: GateBinding): void {
+    const relay = status[`switch:${gate.relay}`] as ShellySwitchStatus | undefined
+    if (relay?.output !== true) {
+      gate.relayHeldPolls = 0
+      return
+    }
+
+    // One poll can legitimately land inside a pulse. Two cannot: the polls are
+    // a second apart and the pulse is half of one.
+    gate.relayHeldPolls++
+    if (gate.relayHeldPolls < 2) return
+
+    this.log.error(
+      `${this.config.ip}: switch:${gate.relay} has stayed closed across ${gate.relayHeldPolls} polls. ` +
+        `Its auto-off did not fire, so it is holding the gate's step input down and the operator will ` +
+        `be ignoring its remote. Opening it.`,
+    )
+    void this.client
+      .setSwitch(gate.relay, false)
+      .then(() => this.log.info(`${this.config.ip}: released switch:${gate.relay}`))
+      .catch((err) =>
+        this.log.error(
+          `${this.config.ip}: could not release switch:${gate.relay}: ${err}. ` +
+            `Cutting power to the operator is the only way out of this.`,
+        ),
+      )
   }
 
   /** Report the gate's full state, whoever caused the change. */

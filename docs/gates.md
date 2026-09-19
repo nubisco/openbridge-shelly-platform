@@ -209,6 +209,19 @@ relay, and until someone does, neither the app nor the handset opens the gate.
 A separate supply breaks the loop at step 2, which is the only step under your control.
 Everything else here is mitigation.
 
+### What the plugin does about it
+
+A pulse is half a second and the device's own auto-off ends it, so the step relay should
+never be closed on two polls a second apart. When it is, that timer did not run and the
+relay is holding the step input down, which is the state where neither the app nor the
+handset opens the gate. The plugin says so and opens the relay itself.
+
+This is worth attempting even though the sag that stops the timer often takes the device
+offline with it: the device may be left just responsive enough to answer, and clearing it
+from here saves someone walking out to cut the power. When the device has gone entirely,
+nothing can reach it, and cutting power is the only way out. That is the case the separate
+supply prevents, and why it remains the actual fix rather than this.
+
 ## When the device cannot be reached
 
 A gate does not stop being a gate while its controller is offline, but what happened

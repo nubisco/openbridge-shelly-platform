@@ -14,10 +14,11 @@ let closedLimit = true
 let autoOff = true
 let inputInvert: Record<number, boolean> = { 0: true, 1: true }
 let inputType = 'switch'
+let relayOutput = false
 const setCalls: string[] = []
 
 const status = () => ({
-  'switch:0': { id: 0, output: false, apower: 0 },
+  'switch:0': { id: 0, output: relayOutput, apower: 0 },
   // The Uni's second relay, left for something else entirely.
   'switch:1': { id: 1, output: false },
   'input:0': { id: 0, state: openLimit },
@@ -65,6 +66,7 @@ beforeEach(() => {
   autoOff = true
   inputInvert = { 0: true, 1: true }
   inputType = 'switch'
+  relayOutput = false
   setCalls.length = 0
 })
 
@@ -327,5 +329,57 @@ describe('gate telemetry shape', () => {
     // Anything reading this must not have to cope with two shapes depending on
     // who moved the gate.
     expect(fromCommand).toEqual(fromPoll)
+  })
+})
+
+describe('a step relay that will not open', () => {
+  it('leaves a single poll alone, which can land inside a real pulse', async () => {
+    const { ctx, device } = await setupGate()
+    relayOutput = true
+    await device.poll(ctx)
+
+    // Polls are a second apart and a pulse is half of one, so one sighting
+    // proves nothing.
+    expect(setCalls.filter((c) => c.includes('on=false'))).toHaveLength(0)
+  })
+
+  it('opens it after two polls, because the auto-off plainly did not fire', async () => {
+    const { ctx, device } = await setupGate()
+    relayOutput = true
+    await device.poll(ctx)
+    await device.poll(ctx)
+    await new Promise((r) => setTimeout(r, 50))
+
+    // A held step input makes the operator ignore its own handset, so nobody
+    // can open the gate until this is released.
+    const off = setCalls.filter((c) => c.includes('on=false'))
+    expect(off).toHaveLength(1)
+    expect(off[0]).toContain('id=0')
+  })
+
+  it('says what it saw and what it did', async () => {
+    const { ctx, device, log } = await setupGate()
+    relayOutput = true
+    await device.poll(ctx)
+    await device.poll(ctx)
+    // The release is fired without being awaited, so let it land rather than
+    // leaving it to arrive during the next test.
+    await new Promise((r) => setTimeout(r, 50))
+    expect(log.error).toHaveBeenCalledWith(expect.stringContaining('stayed closed'))
+  })
+
+  it('forgets the count once the relay opens again', async () => {
+    const { ctx, device } = await setupGate()
+    relayOutput = true
+    await device.poll(ctx)
+    relayOutput = false
+    await device.poll(ctx)
+    relayOutput = true
+    await device.poll(ctx)
+    await new Promise((r) => setTimeout(r, 50))
+
+    // The second sighting has to be consecutive, or a gate pulsed once a
+    // second would be read as latched.
+    expect(setCalls.filter((c) => c.includes('on=false'))).toHaveLength(0)
   })
 })
