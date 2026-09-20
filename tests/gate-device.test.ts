@@ -74,11 +74,13 @@ function makeContext() {
   const telemetry: Record<string, Record<string, unknown>> = {}
   const registered: Array<{ id: string; name: string; widgetType: string }> = []
   const controls: Array<{ deviceId: string; controlId: string; handler: (v: unknown) => unknown }> = []
+  const events: Array<{ deviceId: string; type: string; message: string; source?: string }> = []
   const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
   return {
     telemetry,
     registered,
     controls,
+    events,
     log,
     ctx: {
       config: {},
@@ -89,6 +91,7 @@ function makeContext() {
       registerDevice: (d: any) => registered.push(d),
       registerControl: (deviceId: string, controlId: string, handler: any) =>
         controls.push({ deviceId, controlId, handler }),
+      recordEvent: (deviceId: string, e: any) => events.push({ deviceId, ...e }),
     } as any,
   }
 }
@@ -381,5 +384,50 @@ describe('a step relay that will not open', () => {
     // The second sighting has to be consecutive, or a gate pulsed once a
     // second would be read as latched.
     expect(setCalls.filter((c) => c.includes('on=false'))).toHaveLength(0)
+  })
+})
+
+describe('the gate timeline', () => {
+  it('records reaching a limit, and who caused it', async () => {
+    const { ctx, device, events } = await setupGate()
+    await device.poll(ctx)
+
+    const closed = events.filter((e) => e.type === 'closed')
+    expect(closed.length).toBeGreaterThan(0)
+    // Nobody pulsed anything, so this was the gate, not us.
+    expect(closed[0].source).toBe('device')
+  })
+
+  it('records a pulse, and attributes the movement that follows to us', async () => {
+    const { ctx, device, controls, events } = await setupGate()
+    await device.poll(ctx)
+    events.length = 0
+
+    await controls[0].handler('open')
+    expect(events.some((e) => e.type === 'pulse')).toBe(true)
+    const opening = events.find((e) => e.type === 'opening')
+    expect(opening?.source).toBe('openbridge')
+  })
+
+  it('does not record the same state once a second', async () => {
+    const { ctx, device, events } = await setupGate()
+    await device.poll(ctx)
+    const after = events.length
+    await device.poll(ctx)
+    await device.poll(ctx)
+
+    // The poll runs once a second. Recording every call would bury the four
+    // events that matter under eighty-six thousand a day.
+    expect(events.length).toBe(after)
+  })
+
+  it('records a latched relay, which is what someone comes looking for', async () => {
+    const { ctx, device, events } = await setupGate()
+    relayOutput = true
+    await device.poll(ctx)
+    await device.poll(ctx)
+    await new Promise((r) => setTimeout(r, 50))
+
+    expect(events.some((e) => e.type === 'fault' && /stayed closed/.test(e.message))).toBe(true)
   })
 })

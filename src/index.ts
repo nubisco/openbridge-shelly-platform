@@ -56,6 +56,14 @@ interface PluginContext {
   reportTelemetry(deviceId: string, data: Record<string, unknown>): void
   registerDevice(device: { id: string; name: string; widgetType: string; manufacturer?: string; model?: string }): void
   registerControl(deviceId: string, controlId: string, handler: (value: unknown) => void | Promise<void>): void
+  /**
+   * Record something that happened, for the device's timeline in OpenBridge.
+   * Optional: an older host will not have it, so every call is guarded.
+   */
+  recordEvent?(
+    deviceId: string,
+    event: { type: string; message: string; source?: string; data?: Record<string, unknown> },
+  ): void
   getHapBridge?(): { bridge: unknown; hap: unknown } | null
 }
 
@@ -384,6 +392,12 @@ export class ShellyGen2Device extends PolledShellyDevice {
   private readonly client: ShellyGen2Client
   private readonly bindings: Gen2Binding[] = []
   private gate: GateBinding | null = null
+  /** Bound at setup, so the poll path can record without carrying ctx around. */
+  private gateEventSink: PluginContext['recordEvent'] | null = null
+  /** Last state written to the timeline, so a poll does not record every second. */
+  private lastRecordedState: string | null = null
+  /** When we last pulsed, to tell our own commands from the remote's. */
+  private lastPulseAt = 0
 
   constructor(config: ShellyDeviceConfig, log: PluginLogger) {
     super(config, log)
@@ -696,14 +710,45 @@ export class ShellyGen2Device extends PolledShellyDevice {
         // something physical, and without a record of it an incident cannot be
         // told apart from someone using the remote.
         this.log.info(`${displayName}: pulsing switch:${relay}`)
+        this.lastPulseAt = Date.now()
+        ctx.recordEvent?.(deviceId, {
+          type: 'pulse',
+          message: `Pulsed the step input on switch:${relay}`,
+          source: 'openbridge',
+        })
         await this.client.pulseSwitch(relay)
       },
       onLog: (message) => this.log.info(`${displayName}: ${message}`),
-      onChange: () => {
+      onChange: (state, target) => {
         // A command must publish exactly what a poll publishes. Reporting a
         // narrower object here would make the telemetry shape depend on who
         // moved the gate, and anything reading it would have to cope with both.
         this.publishGate(ctx)
+
+        // Only real transitions, and only the ones worth a line months later.
+        // The poll runs once a second, so recording every call would bury the
+        // four events that matter under eighty-six thousand a day.
+        if (state === this.lastRecordedState) return
+        const previous = this.lastRecordedState
+        this.lastRecordedState = state
+
+        // A gate that starts moving without us having pulsed it was driven by
+        // its remote, its keypad, or the board's own timer. Saying which is
+        // beyond us, but saying that it was not us is not.
+        const commanded = Date.now() - this.lastPulseAt < 5000
+        const events: Record<string, string> = {
+          open: 'Reached the open limit',
+          closed: 'Reached the closed limit',
+          opening: 'Started opening',
+          closing: 'Started closing',
+          stopped: 'Stopped between the limits',
+        }
+        ctx.recordEvent?.(deviceId, {
+          type: state,
+          message: events[state] ?? `Now ${state}`,
+          source: commanded ? 'openbridge' : 'device',
+          data: { from: previous, target },
+        })
       },
     })
 
@@ -739,6 +784,7 @@ export class ShellyGen2Device extends PolledShellyDevice {
       }
     }
 
+    this.gateEventSink = ctx.recordEvent?.bind(ctx)
     this.gate = {
       deviceId,
       displayName,
@@ -815,6 +861,11 @@ export class ShellyGen2Device extends PolledShellyDevice {
     gate.relayHeldPolls++
     if (gate.relayHeldPolls < 2) return
 
+    this.gateEventSink?.(gate.deviceId, {
+      type: 'fault',
+      message: `The step relay stayed closed across ${gate.relayHeldPolls} polls and was opened`,
+      source: 'openbridge',
+    })
     this.log.error(
       `${this.config.ip}: switch:${gate.relay} has stayed closed across ${gate.relayHeldPolls} polls. ` +
         `Its auto-off did not fire, so it is holding the gate's step input down and the operator will ` +
