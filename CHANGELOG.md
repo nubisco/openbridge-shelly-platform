@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.4.0...v1.5.0) (2026-09-20)
+
+
+### Features
+
+* write the gate's history to its OpenBridge timeline ([b237c9e](https://github.com/nubisco/openbridge-shelly-platform/commit/b237c9ed4abe303fc1bb8765bb0bba1fbdfd65cb))
+
 # [1.4.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.3.3...v1.4.0) (2026-09-19)
 
 
