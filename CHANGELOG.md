@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.5.0...v1.6.0) (2026-09-23)
+
+
+### Features
+
+* offer a reboot on every Shelly device ([078d3dd](https://github.com/nubisco/openbridge-shelly-platform/commit/078d3dd2d1ee2d1de2d7a219bf7fe0c9cad9d484))
+
 # [1.5.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.4.0...v1.5.0) (2026-09-20)
 
 
