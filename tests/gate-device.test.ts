@@ -96,6 +96,18 @@ function makeContext() {
   }
 }
 
+/**
+ * Pick a control by id.
+ *
+ * Positional lookup broke the moment the device gained a `reboot` control,
+ * which says nothing about the gate and should not be able to fail these.
+ */
+const control = (controls: Array<{ controlId: string; handler: (v: unknown) => unknown }>, id: string) => {
+  const found = controls.find((c) => c.controlId === id)
+  if (!found) throw new Error(`no '${id}' control was registered (got: ${controls.map((c) => c.controlId).join(', ')})`)
+  return found
+}
+
 const gateConfig = (extra: Record<string, unknown> = {}) => ({
   ip: host,
   name: 'Home',
@@ -260,14 +272,14 @@ describe('gate polling', () => {
 describe('gate control', () => {
   it('registers a target control and a raw step control', async () => {
     const { controls } = await setupGate()
-    expect(controls.map((c) => c.controlId)).toEqual(['target', 'step'])
+    expect(controls.map((c) => c.controlId)).toEqual(['reboot', 'target', 'step'])
   })
 
   it('pulses the step relay once to open a closed gate', async () => {
     const { ctx, device, controls, telemetry } = await setupGate()
     await device.poll(ctx)
 
-    await controls[0].handler('open')
+    await control(controls, 'target').handler('open')
     expect(setCalls).toHaveLength(1)
     expect(setCalls[0]).toContain('id=0')
     expect(setCalls[0]).toContain('on=true')
@@ -280,17 +292,17 @@ describe('gate control', () => {
     const { ctx, device, controls } = await setupGate()
     await device.poll(ctx)
 
-    await controls[0].handler('closed')
+    await control(controls, 'target').handler('closed')
     expect(setCalls).toHaveLength(0)
   })
 
   it('takes two pulses to reverse a moving gate', async () => {
     const { ctx, device, controls } = await setupGate()
     await device.poll(ctx)
-    await controls[0].handler('open')
+    await control(controls, 'target').handler('open')
     setCalls.length = 0
 
-    await controls[0].handler('closed')
+    await control(controls, 'target').handler('closed')
     expect(setCalls).toHaveLength(2)
   })
 
@@ -298,7 +310,7 @@ describe('gate control', () => {
     const { ctx, device, controls } = await setupGate()
     await device.poll(ctx)
 
-    await controls[1].handler(null)
+    await control(controls, 'step').handler(null)
     expect(setCalls).toHaveLength(1)
   })
 
@@ -306,14 +318,14 @@ describe('gate control', () => {
     const { ctx, device, controls, telemetry } = await setupGate()
     await device.poll(ctx)
 
-    await controls[0].handler(true)
+    await control(controls, 'target').handler(true)
     expect(telemetry['shelly-aabbccddeeff-gate'].state).toBe('opening')
   })
 
   it('stops its travel timer when the device runner stops', async () => {
     const { ctx, device, controls } = await setupGate({ travelTime: 1 })
     await device.poll(ctx)
-    await controls[0].handler('open')
+    await control(controls, 'target').handler('open')
 
     // A gate left mid-travel must not keep a timer alive after shutdown.
     expect(() => device.stop()).not.toThrow()
@@ -326,7 +338,7 @@ describe('gate telemetry shape', () => {
     await device.poll(ctx)
     const fromPoll = Object.keys(telemetry['shelly-aabbccddeeff-gate']).sort()
 
-    await controls[0].handler('open')
+    await control(controls, 'target').handler('open')
     const fromCommand = Object.keys(telemetry['shelly-aabbccddeeff-gate']).sort()
 
     // Anything reading this must not have to cope with two shapes depending on
@@ -403,7 +415,7 @@ describe('the gate timeline', () => {
     await device.poll(ctx)
     events.length = 0
 
-    await controls[0].handler('open')
+    await control(controls, 'target').handler('open')
     expect(events.some((e) => e.type === 'pulse')).toBe(true)
     const opening = events.find((e) => e.type === 'opening')
     expect(opening?.source).toBe('openbridge')

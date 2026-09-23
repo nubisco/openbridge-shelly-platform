@@ -92,6 +92,16 @@ export class ShellyGen1Client {
   getEmeter(channel: number): Promise<ShellyEmeterStatus> {
     return this.request<ShellyEmeterStatus>(`/emeter/${channel}`)
   }
+
+  /**
+   * `/reboot` — restart the device.
+   *
+   * Gen1 has no RPC, so this is the whole of it: a plain GET, answered with
+   * `{"ok":true}` just before the device goes away.
+   */
+  async reboot(): Promise<void> {
+    await this.request<{ ok?: boolean }>('/reboot')
+  }
 }
 
 /**

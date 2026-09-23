@@ -9,6 +9,7 @@ let host: string
 let failing = false
 let coverMode = false
 const setCalls: string[] = []
+const rebootCalls: string[] = []
 
 const SWITCH_STATUS = {
   'switch:0': { id: 0, output: true, apower: 41.2, voltage: 232.1, current: 0.18, aenergy: { total: 12045.6 } },
@@ -41,6 +42,10 @@ beforeAll(async () => {
       setCalls.push(url)
       return json({ was_on: false })
     }
+    if (url.startsWith('/rpc/Shelly.Reboot')) {
+      rebootCalls.push(url)
+      return json(null)
+    }
     res.writeHead(404)
     res.end('Not Found')
   })
@@ -56,17 +61,20 @@ beforeEach(() => {
   failing = false
   coverMode = false
   setCalls.length = 0
+  rebootCalls.length = 0
 })
 
 function makeContext() {
   const telemetry: Record<string, Record<string, unknown>> = {}
-  const registered: Array<{ id: string; name: string; widgetType: string }> = []
+  const registered: Array<{ id: string; name: string; widgetType: string; actions?: any[] }> = []
   const controls: Array<{ deviceId: string; controlId: string; handler: (v: unknown) => unknown }> = []
+  const events: Array<{ deviceId: string; type: string; message: string }> = []
   const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
   return {
     telemetry,
     registered,
     controls,
+    events,
     log,
     ctx: {
       config: {},
@@ -77,6 +85,7 @@ function makeContext() {
       registerDevice: (d: any) => registered.push(d),
       registerControl: (deviceId: string, controlId: string, handler: any) =>
         controls.push({ deviceId, controlId, handler }),
+      recordEvent: (deviceId: string, e: any) => events.push({ deviceId, ...e }),
     } as any,
   }
 }
@@ -98,12 +107,37 @@ describe('ShellyGen2Device setup', () => {
     await device.setup(ctx, null, null)
 
     // This control is what makes the toggle in the OpenBridge devices view work.
-    expect(controls.map((c) => c.controlId)).toEqual(['active', 'active'])
+    expect(controls.map((c) => c.controlId)).toEqual(['reboot', 'active', 'reboot', 'active'])
 
-    await controls[1].handler(true)
+    await controls.filter((c) => c.controlId === 'active')[1].handler(true)
     expect(setCalls).toHaveLength(1)
     expect(setCalls[0]).toContain('id=1')
     expect(setCalls[0]).toContain('on=true')
+  })
+
+  it('offers a reboot on every channel, and says it takes the whole box down', async () => {
+    const { ctx, registered, controls, events } = makeContext()
+    const device = new ShellyGen2Device({ ip: host } as any, ctx.log)
+    await device.setup(ctx, null, null)
+
+    // Declared per device, because OpenBridge shows one Shelly's channels as
+    // separate devices and the button has to be on whichever one is open.
+    for (const d of registered) {
+      expect(d.actions?.map((a: any) => a.id)).toEqual(['reboot'])
+    }
+
+    // The confirmation has to say the part the button cannot: this is not
+    // scoped to the channel whose inspector you are looking at.
+    const action = registered[0].actions[0]
+    expect(action.confirm).toMatch(/whole Shelly/i)
+    expect(action.confirm).toMatch(/every channel/i)
+
+    await controls.filter((c) => c.controlId === 'reboot')[0].handler(true)
+    expect(rebootCalls).toHaveLength(1)
+
+    // On the timeline before the device goes away, so the outage that follows
+    // has a cause next to it rather than looking like a fault.
+    expect(events.some((e) => e.type === 'reboot')).toBe(true)
   })
 
   it('honours a per-channel name override', async () => {

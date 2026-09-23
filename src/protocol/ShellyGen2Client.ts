@@ -177,6 +177,18 @@ export class ShellyGen2Client {
   getInputConfig(id: number): Promise<ShellyInputConfig> {
     return this.call<ShellyInputConfig>('Input.GetConfig', { id })
   }
+
+  /**
+   * `Shelly.Reboot`: restart the device.
+   *
+   * The device acknowledges and then goes away, so the next few polls will
+   * fail and that is not an error worth reporting as one. Relay state across a
+   * reboot is the device's own `initial_state`, which is why the caller is
+   * expected to say so before asking.
+   */
+  async reboot(): Promise<void> {
+    await this.call('Shelly.Reboot')
+  }
 }
 
 interface RawResponse {

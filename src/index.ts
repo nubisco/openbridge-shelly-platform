@@ -54,7 +54,18 @@ interface PluginContext {
   config: Record<string, unknown>
   log: PluginLogger
   reportTelemetry(deviceId: string, data: Record<string, unknown>): void
-  registerDevice(device: { id: string; name: string; widgetType: string; manufacturer?: string; model?: string }): void
+  registerDevice(device: {
+    id: string
+    name: string
+    widgetType: string
+    manufacturer?: string
+    model?: string
+    /**
+     * One-shot commands OpenBridge should offer as buttons. Optional: an older
+     * host ignores the field, which costs nothing but the button.
+     */
+    actions?: Array<{ id: string; label: string; confirm?: string; danger?: boolean }>
+  }): void
   registerControl(deviceId: string, controlId: string, handler: (value: unknown) => void | Promise<void>): void
   /**
    * Record something that happened, for the device's timeline in OpenBridge.
@@ -69,6 +80,47 @@ interface PluginContext {
 
 function definePlugin<T extends { manifest: { name: string; version: string } }>(plugin: T): T {
   return plugin
+}
+
+// ---- Reboot ----
+
+/**
+ * Every Shelly can restart itself, so every device this plugin registers
+ * offers it.
+ *
+ * The confirmation is worth the interruption for one reason that is easy to
+ * get wrong from the button alone: a Shelly is one box with several channels,
+ * and OpenBridge shows those channels as separate devices. Rebooting from
+ * "Pool Filter" also takes "Pool Light" away, and a gate mid-travel stays
+ * where it stopped. That reaches further than the control implies, which is
+ * the test for whether to confirm at all.
+ */
+const REBOOT_ACTION = {
+  id: 'reboot',
+  label: 'Reboot',
+  confirm:
+    'The whole Shelly restarts, not just this channel, so every channel on it stops answering for about 30 seconds. ' +
+    'Relays come back in their configured initial state, and anything mid-travel is left where it stopped.',
+} as const
+
+/**
+ * Wire the reboot control for one device id.
+ *
+ * The device acknowledges and then goes away, so the polls that follow will
+ * fail for a while. That is the expected shape of a reboot and not a fault, so
+ * it is recorded on the timeline before the call rather than reported as an
+ * error afterwards.
+ */
+function registerReboot(ctx: PluginContext, deviceId: string, reboot: () => Promise<void>): void {
+  ctx.registerControl(deviceId, 'reboot', async () => {
+    ctx.log.info(`${deviceId}: rebooting on request`)
+    ctx.recordEvent?.(deviceId, {
+      type: 'reboot',
+      message: 'Reboot requested from OpenBridge. The device will be unreachable for a few seconds.',
+      source: 'openbridge',
+    })
+    await reboot()
+  })
 }
 
 // ---- Config schema ----
@@ -286,7 +338,9 @@ export class ShellyEnergyDevice extends PolledShellyDevice {
         widgetType: 'energy_meter',
         manufacturer: 'Shelly',
         model: modelName,
+        actions: [REBOOT_ACTION],
       })
+      registerReboot(ctx, deviceId, () => this.client.reboot())
 
       let accessory: EnergyAccessory | null = null
       if (exposeToHomeKit) {
@@ -488,7 +542,9 @@ export class ShellyGen2Device extends PolledShellyDevice {
           widgetType: 'switch',
           manufacturer: 'Shelly',
           model: modelName,
+          actions: [REBOOT_ACTION],
         })
+        registerReboot(ctx, deviceId, () => this.client.reboot())
 
         // This is what makes the toggle in the OpenBridge devices view work.
         ctx.registerControl(deviceId, 'active', async (value: unknown) => {
@@ -548,7 +604,9 @@ export class ShellyGen2Device extends PolledShellyDevice {
             widgetType: 'energy_meter',
             manufacturer: 'Shelly',
             model: modelName,
+            actions: [REBOOT_ACTION],
           })
+          registerReboot(ctx, deviceId, () => this.client.reboot())
 
           let accessory: EnergyAccessory | null = null
           if (exposeToHomeKit) {
@@ -758,7 +816,9 @@ export class ShellyGen2Device extends PolledShellyDevice {
       widgetType: 'gate',
       manufacturer: 'Shelly',
       model: accessoryOptions.model,
+      actions: [REBOOT_ACTION],
     })
+    registerReboot(ctx, deviceId, () => this.client.reboot())
 
     // `target` is the absolute command, the same one HomeKit issues. `step` is
     // the physical button: the only way to halt a gate mid-travel, which the
