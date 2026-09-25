@@ -1,3 +1,10 @@
+## [1.6.1](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.0...v1.6.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* **gate:** stop the tile claiming the gate is opening while it sits closed ([1829f56](https://github.com/nubisco/openbridge-shelly-platform/commit/1829f562bb0a132da4b1dac976205261e4c888cf))
+
 # [1.6.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.5.0...v1.6.0) (2026-09-23)
 
 
