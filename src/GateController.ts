@@ -163,10 +163,12 @@ export class GateController {
       this.clearTravelTimer()
       this.lastDirection = 'open'
       this.transition('open')
+      this.adoptArrivalAsTarget('open')
     } else if (closedLimit) {
       this.clearTravelTimer()
       this.lastDirection = 'closed'
       this.transition('closed')
+      this.adoptArrivalAsTarget('closed')
     } else if (previous === 'open' || previous === 'closed') {
       // It just left a limit. Nothing else can put it here, so the direction is
       // certain even though no command was issued: a gate that leaves the open
@@ -339,6 +341,34 @@ export class GateController {
         this.clearTravelTimer()
         this.transition('stopped')
     }
+  }
+
+  /**
+   * A gate parked at a limit is not on its way anywhere, so make that its goal.
+   *
+   * HomeKit renders a garage door from the pair of characteristics rather than
+   * from the position alone: a target of OPEN against a current of CLOSED is a
+   * transition in progress, and the Home app draws "Opening..." with a spinner
+   * for as long as the two disagree. Nothing in the limits ever contradicts
+   * that, because the limits only describe position.
+   *
+   * So a gate opened from HomeKit and then closed by the remote, the wall
+   * button or the operator's own auto-close timer used to sit at its closed
+   * limit with the target still reading "open", and the tile claimed it was
+   * opening indefinitely. Pressing the tile appeared to "fix" it because
+   * setting the target to closed is what finally made the pair agree, which is
+   * why it took two presses to open the gate: the first only corrected the
+   * display.
+   *
+   * Left alone while a pulse sequence is running. Mid-sequence the gate is
+   * still resting on the limit it was told to leave, and reading that as an
+   * arrival would cancel the command that is being carried out.
+   */
+  private adoptArrivalAsTarget(arrived: GateTarget): void {
+    if (this.sequenceRunning) return
+    if (this.targetValue === arrived) return
+    this.targetValue = arrived
+    this.options.onChange?.(this.stateValue, this.targetValue)
   }
 
   /** True when the gate is where it was asked to be, or on its way there. */

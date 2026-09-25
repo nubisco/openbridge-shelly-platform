@@ -80,6 +80,94 @@ describe('GateController: reading the limits', () => {
   })
 })
 
+describe('GateController: the target follows the gate', () => {
+  /**
+   * The Home app renders a garage door from the *pair* of characteristics, not
+   * from the position: a TargetDoorState of OPEN against a CurrentDoorState of
+   * CLOSED is a transition in progress, and it draws "Opening..." with a
+   * spinner. So a target left behind after the gate has settled somewhere else
+   * is not a cosmetic inaccuracy, it is a tile that claims the gate is moving
+   * while it sits still.
+   *
+   * Reported from a gate that had been parked and closed for eighty minutes
+   * and still showed "Opening..." on every app launch and on CarPlay.
+   */
+  it('follows the gate home when something else closes it', async () => {
+    const { controller } = makeGate()
+
+    controller.observe(false, true)
+    await controller.setTarget('open')
+    controller.observe(true, false)
+    expect(controller.state).toBe('open')
+    expect(controller.target).toBe('open')
+
+    // Now the remote, the wall button or the operator's own auto-close timer
+    // shuts it. Nothing tells the plugin: it only sees the limits move.
+    controller.observe(false, false)
+    controller.observe(false, true)
+
+    expect(controller.state).toBe('closed')
+    // The bug: this stayed 'open', so HomeKit showed "Opening..." for as long
+    // as the gate sat there.
+    expect(controller.target).toBe('closed')
+  })
+
+  it('follows the gate home when something else opens it', async () => {
+    const { controller } = makeGate()
+
+    controller.observe(true, false)
+    await controller.setTarget('closed')
+    controller.observe(false, true)
+    expect(controller.target).toBe('closed')
+
+    controller.observe(false, false)
+    controller.observe(true, false)
+
+    expect(controller.state).toBe('open')
+    expect(controller.target).toBe('open')
+  })
+
+  it('tells HomeKit about it, rather than only fixing its own books', async () => {
+    const { controller, changes } = makeGate()
+    controller.observe(false, true)
+    await controller.setTarget('open')
+    controller.observe(true, false)
+
+    changes.length = 0
+    controller.observe(false, false)
+    controller.observe(false, true)
+
+    // An update nobody is told about leaves the tile exactly as wrong as before.
+    expect(changes.some(([state, target]) => state === 'closed' && target === 'closed')).toBe(true)
+  })
+
+  it('does not overrule a command that is still being carried out', async () => {
+    // Mid-sequence the gate is still on the limit it was told to leave. Reading
+    // that as "it arrived here, so this is the goal" would cancel the command
+    // the user just gave.
+    const { controller } = makeGate({ settleMs: 0 })
+    controller.observe(false, true)
+
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const slow = new GateController({
+      travelTimeMs: 200,
+      pulseGapMs: 2,
+      settleMs: 0,
+      pulse: () => held,
+    })
+    slow.observe(false, true)
+    const pending = slow.setTarget('open')
+
+    // While the pulse is in flight, a poll lands showing it still closed.
+    slow.observe(false, true)
+    expect(slow.target).toBe('open')
+
+    release()
+    await pending
+  })
+})
+
 describe('GateController: reaching a target', () => {
   it('opens a closed gate with a single pulse', async () => {
     const { controller, pulses } = makeGate()
