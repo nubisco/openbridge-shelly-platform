@@ -1,3 +1,10 @@
+## [1.6.3](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.2...v1.6.3) (2026-10-06)
+
+
+### Bug Fixes
+
+* cap retry backoff at one minute, not five ([b4bcdb6](https://github.com/nubisco/openbridge-shelly-platform/commit/b4bcdb61079db7226c82dc5a49014cffd211967c))
+
 ## [1.6.2](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.1...v1.6.2) (2026-10-06)
 
 
