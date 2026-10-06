@@ -1,3 +1,10 @@
+## [1.6.4](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.3...v1.6.4) (2026-10-06)
+
+
+### Bug Fixes
+
+* **gate:** re-check a stalled device before refusing to pulse ([a5cde15](https://github.com/nubisco/openbridge-shelly-platform/commit/a5cde15ab296147a699a0bcc0374755bd3905a1f))
+
 ## [1.6.3](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.2...v1.6.3) (2026-10-06)
 
 
