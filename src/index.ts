@@ -1142,13 +1142,20 @@ const nativePlugin = definePlugin({
      * outright often enough to lose the startup probe while being perfectly
      * usable a minute later.
      *
-     * Backoff grows to a five minute ceiling and then keeps going. There is no
+     * Backoff grows to a one minute ceiling and then keeps going. There is no
      * attempt limit on purpose: giving up after N tries just reintroduces the
      * same bug with extra steps, and a device that returns after an afternoon
      * off should rejoin on its own.
+     *
+     * The ceiling is deliberately low. These devices do not fail steadily, they
+     * come and go in windows, so the question is not "how long until it is
+     * fixed" but "how likely is a probe to land while it is answering". A five
+     * minute ceiling was tried first and took ten minutes to recover a gate
+     * that was answering 5/5 by hand most of that time: the probes kept landing
+     * in the gaps. One probe a minute costs nothing and catches a short window.
      */
     const scheduleRetry = (config: ShellyDeviceConfig, attempt: number): void => {
-      const delayMs = Math.min(15_000 * 2 ** (attempt - 1), 300_000)
+      const delayMs = Math.min(15_000 * 2 ** (attempt - 1), 60_000)
       const timer = setTimeout(() => {
         pendingRetries.delete(timer)
         void startDevice(config)
