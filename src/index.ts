@@ -1060,6 +1060,8 @@ function toGateTarget(value: unknown): GateTarget {
 //   }
 
 const runners: PolledShellyDevice[] = []
+/** Pending retry timers, so stop() can cancel work that is still waiting. */
+const pendingRetries = new Set<ReturnType<typeof setTimeout>>()
 
 const nativePlugin = definePlugin({
   manifest: {
@@ -1100,39 +1102,86 @@ const nativePlugin = definePlugin({
       ctx.log.info('No HAP bridge available — running with OpenBridge telemetry only')
     }
 
+    /**
+     * Identify a device and start polling it.
+     *
+     * Probe with the generation-agnostic endpoint before committing to a
+     * client: `/shelly` answers on every generation, and only Gen2+ reports
+     * `gen`. Guessing wrong means 404 on every call forever.
+     */
+    const startDevice = async (config: ShellyDeviceConfig): Promise<void> => {
+      const probe = new ShellyGen1Client(config.ip, {
+        username: config.username,
+        password: config.password,
+        timeout: config.timeout,
+      })
+      const info = await probe.getDeviceInfo()
+      const runner: PolledShellyDevice =
+        info.gen !== undefined && info.gen >= 2
+          ? new ShellyGen2Device(config, ctx.log)
+          : new ShellyEnergyDevice(config, ctx.log)
+
+      await runner.setup(ctx, hap, bridge)
+      runner.start(ctx)
+      runners.push(runner)
+    }
+
+    /**
+     * Keep trying a device that did not answer, instead of abandoning it.
+     *
+     * A device unreachable at startup is almost never a device that is gone.
+     * After a power cut the bridge boots faster than the devices do, so the
+     * first probe reliably fails, and the old behaviour then skipped that
+     * device for the lifetime of the process: a gate, a pool switch and whole-
+     * house energy monitoring silently absent until somebody noticed and
+     * restarted by hand. It happened four times in one week on the reference
+     * install.
+     *
+     * Slow devices need this just as much. Two Gen2 units there answer a
+     * 261-byte request in anything from half a second to fifteen, and fail
+     * outright often enough to lose the startup probe while being perfectly
+     * usable a minute later.
+     *
+     * Backoff grows to a five minute ceiling and then keeps going. There is no
+     * attempt limit on purpose: giving up after N tries just reintroduces the
+     * same bug with extra steps, and a device that returns after an afternoon
+     * off should rejoin on its own.
+     */
+    const scheduleRetry = (config: ShellyDeviceConfig, attempt: number): void => {
+      const delayMs = Math.min(15_000 * 2 ** (attempt - 1), 300_000)
+      const timer = setTimeout(() => {
+        pendingRetries.delete(timer)
+        void startDevice(config)
+          .then(() => ctx.log.info(`${config.ip}: recovered after ${attempt} retr${attempt === 1 ? 'y' : 'ies'}`))
+          .catch((err) => {
+            const message = err instanceof ShellyProtocolError ? err.message : String((err as Error)?.message ?? err)
+            ctx.log.debug(`${config.ip}: retry ${attempt} failed (${message})`)
+            scheduleRetry(config, attempt + 1)
+          })
+      }, delayMs)
+      // Unref so a pending retry cannot hold the process open by itself.
+      timer.unref?.()
+      pendingRetries.add(timer)
+    }
+
     for (const config of devices) {
       try {
-        // Probe once with the generation-agnostic endpoint before committing to
-        // a client: `/shelly` answers on every generation, and only Gen2+
-        // reports `gen`. Guessing wrong means 404 on every call forever.
-        const probe = new ShellyGen1Client(config.ip, {
-          username: config.username,
-          password: config.password,
-          timeout: config.timeout,
-        })
-        const info = await probe.getDeviceInfo()
-        const runner: PolledShellyDevice =
-          info.gen !== undefined && info.gen >= 2
-            ? new ShellyGen2Device(config, ctx.log)
-            : new ShellyEnergyDevice(config, ctx.log)
-
-        await runner.setup(ctx, hap, bridge)
-        runner.start(ctx)
-        runners.push(runner)
+        await startDevice(config)
       } catch (err) {
         const message = err instanceof ShellyProtocolError ? err.message : String((err as Error)?.message ?? err)
-        // Do not start a poll loop for a device we could not identify — that is
-        // how you end up with an error every few seconds and no data.
-        ctx.log.error(`Skipping ${config.ip}: ${message}`)
+        ctx.log.warn(`${config.ip}: not reachable yet (${message}) — will keep retrying`)
+        scheduleRetry(config, 1)
       }
     }
 
     if (runners.length === 0 && devices.length > 0) {
-      ctx.log.warn('No Shelly devices could be started — check the errors above')
+      ctx.log.warn(`No Shelly devices answered yet — retrying ${devices.length} device(s) in the background`)
     }
   },
 
   async stop(ctx: PluginContext) {
+    for (const timer of pendingRetries) clearTimeout(timer)
+    pendingRetries.clear()
     for (const runner of runners) runner.stop()
     runners.length = 0
     ctx.log.info('Stopped polling all devices')
