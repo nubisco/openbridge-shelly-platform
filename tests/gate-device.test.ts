@@ -15,6 +15,8 @@ let autoOff = true
 let inputInvert: Record<number, boolean> = { 0: true, 1: true }
 let inputType = 'switch'
 let relayOutput = false
+/** Simulates the link being down: every request fails, as a stalled wifi hop does. */
+let offline = false
 const setCalls: string[] = []
 
 const status = () => ({
@@ -28,6 +30,10 @@ const status = () => ({
 
 beforeAll(async () => {
   server = http.createServer((req, res) => {
+    if (offline) {
+      res.destroy()
+      return
+    }
     const url = req.url ?? ''
     const json = (body: unknown) => {
       res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -67,6 +73,7 @@ beforeEach(() => {
   inputInvert = { 0: true, 1: true }
   inputType = 'switch'
   relayOutput = false
+  offline = false
   setCalls.length = 0
 })
 
@@ -441,5 +448,46 @@ describe('the gate timeline', () => {
     await new Promise((r) => setTimeout(r, 50))
 
     expect(events.some((e) => e.type === 'fault' && /stayed closed/.test(e.message))).toBe(true)
+  })
+})
+
+describe('pulsing a gate whose last poll failed', () => {
+  it('re-checks the device and pulses when it answers again', async () => {
+    // A stalled 2.4GHz hop times out a poll against a device that is perfectly
+    // alive. Refusing on that stale verdict makes the gate unusable at random,
+    // which sends the person out to the gate in traffic.
+    const { ctx, device, controls } = await setupGate()
+    await device.poll(ctx)
+
+    offline = true
+    await device.poll(ctx)
+    offline = false
+
+    await control(controls, 'target').handler('open')
+    expect(setCalls).toHaveLength(1)
+  })
+
+  it('still refuses when the re-check fails too', async () => {
+    // The property being protected is unchanged: nothing is sent to a device
+    // that has not just proven it is listening, because a request that times
+    // out may still arrive and move the gate with nobody able to see it.
+    const { ctx, device, controls } = await setupGate()
+    await device.poll(ctx)
+
+    offline = true
+    await device.poll(ctx)
+
+    await expect(control(controls, 'target').handler('open')).rejects.toThrow(/not answering/)
+    expect(setCalls).toHaveLength(0)
+  })
+
+  it('does not re-check when the device was answering all along', async () => {
+    // The extra read is the cost of recovering from a stall, not something
+    // every pulse pays.
+    const { ctx, device, controls, log } = await setupGate()
+    await device.poll(ctx)
+
+    await control(controls, 'target').handler('open')
+    expect(log.info.mock.calls.flat().join(' ')).not.toMatch(/re-check/)
   })
 })

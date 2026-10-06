@@ -758,11 +758,29 @@ export class ShellyGen2Device extends PolledShellyDevice {
         // hopefully. A request to an unresponsive device is not a no-op: it can
         // arrive and be acted on while the reply is lost, which moves the gate
         // with nobody able to see that it did.
+        //
+        // But "the last poll failed" and "the device is gone" are not the same
+        // thing. On a congested 2.4GHz channel the link stalls for seconds at a
+        // time, so a poll can time out against a device that is perfectly alive
+        // and answers again moments later. Refusing on that stale verdict makes
+        // the gate unusable at random, which is a safety problem of its own:
+        // the person ends up walking to the gate in traffic.
+        //
+        // So the flag opens a question rather than settling one. One fresh read
+        // answers it, and only a read that also fails refuses the pulse. The
+        // property being protected is unchanged: nothing is sent to a device
+        // that has not just proven it is listening.
         if (this.gate?.unreachable) {
-          throw new ShellyProtocolError(
-            `${this.config.ip} is not answering, so the gate was not pulsed. ` +
-              `Commanding a gate that cannot be read risks moving it unseen.`,
-          )
+          try {
+            await this.client.getStatus()
+            this.gate.unreachable = false
+            this.log.info(`${displayName}: device answered on re-check, so the pulse goes ahead`)
+          } catch {
+            throw new ShellyProtocolError(
+              `${this.config.ip} is not answering, so the gate was not pulsed. ` +
+                `Commanding a gate that cannot be read risks moving it unseen.`,
+            )
+          }
         }
         // Always logged. This is the one thing in the plugin that moves
         // something physical, and without a record of it an incident cannot be
