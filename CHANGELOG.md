@@ -1,3 +1,10 @@
+## [1.6.2](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.1...v1.6.2) (2026-10-06)
+
+
+### Bug Fixes
+
+* keep retrying a device that did not answer at startup ([c2ddd79](https://github.com/nubisco/openbridge-shelly-platform/commit/c2ddd792b799c6dc405d57ec27f3b12211712f78))
+
 ## [1.6.1](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.0...v1.6.1) (2026-09-25)
 
 
