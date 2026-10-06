@@ -1,3 +1,10 @@
+## [1.6.5](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.4...v1.6.5) (2026-10-06)
+
+
+### Bug Fixes
+
+* **gate:** refresh position on re-check, not just liveness ([e34afa5](https://github.com/nubisco/openbridge-shelly-platform/commit/e34afa502c6df3ef0fc807433d385ea828ece634))
+
 ## [1.6.4](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.3...v1.6.4) (2026-10-06)
 
 
