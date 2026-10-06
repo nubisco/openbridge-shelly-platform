@@ -771,16 +771,10 @@ export class ShellyGen2Device extends PolledShellyDevice {
         // property being protected is unchanged: nothing is sent to a device
         // that has not just proven it is listening.
         if (this.gate?.unreachable) {
-          try {
-            await this.client.getStatus()
-            this.gate.unreachable = false
-            this.log.info(`${displayName}: device answered on re-check, so the pulse goes ahead`)
-          } catch {
-            throw new ShellyProtocolError(
-              `${this.config.ip} is not answering, so the gate was not pulsed. ` +
-                `Commanding a gate that cannot be read risks moving it unseen.`,
-            )
-          }
+          throw new ShellyProtocolError(
+            `${this.config.ip} is not answering, so the gate was not pulsed. ` +
+              `Commanding a gate that cannot be read risks moving it unseen.`,
+          )
         }
         // Always logged. This is the one thing in the plugin that moves
         // something physical, and without a record of it an incident cannot be
@@ -842,18 +836,29 @@ export class ShellyGen2Device extends PolledShellyDevice {
     // the physical button: the only way to halt a gate mid-travel, which the
     // HomeKit garage door service has no vocabulary for.
     ctx.registerControl(deviceId, 'target', async (value: unknown) => {
+      await this.refreshIfStalled(ctx)
       await controller.setTarget(toGateTarget(value))
     })
     ctx.registerControl(deviceId, 'step', async () => {
+      await this.refreshIfStalled(ctx)
       await controller.step()
     })
 
     let accessory: GateAccessory | null = null
     if (exposeToHomeKit) {
-      accessory = new GateAccessory(hap, displayName, deviceId, (target) => controller.setTarget(target), {
-        ...accessoryOptions,
-        serialNumber: `${mac}-gate`,
-      })
+      accessory = new GateAccessory(
+        hap,
+        displayName,
+        deviceId,
+        async (target) => {
+          await this.refreshIfStalled(ctx)
+          await controller.setTarget(target)
+        },
+        {
+          ...accessoryOptions,
+          serialNumber: `${mac}-gate`,
+        },
+      )
       try {
         bridge.addBridgedAccessory(accessory.accessory)
       } catch (err) {
@@ -1039,6 +1044,43 @@ export class ShellyGen2Device extends PolledShellyDevice {
     // Reading resumes from whatever the gate reports next, rather than being
     // compared against a state from before the device went away.
     this.gate?.controller.markStale()
+  }
+
+  /**
+   * Give a device flagged unreachable one chance to prove otherwise, before a
+   * command is computed from what it last said.
+   *
+   * Refusing to pulse a gate we cannot read is right: a request that times out
+   * can still arrive and move a heavy gate with nobody able to see that it did.
+   * But "the last poll failed" and "the device is gone" are not the same thing.
+   * Measured on a live gate, the 2.4GHz hop stalls for seconds at a stretch
+   * while the device answers in a tenth of one on either side, so a poll landing
+   * inside a stall condemns hardware that is perfectly alive, and the press that
+   * follows is refused. The person walks to the gate instead.
+   *
+   * This is a full read through the poll's own path, not a liveness ping. A ping
+   * would clear the flag while the limit states and the controller's staleness
+   * still described the moment before the gap, and the command would then be
+   * computed from where the gate used to be. Going through `readOnce` means a
+   * device that answers ends up in exactly the state a successful poll leaves,
+   * with the fresh reading adopted as the truth.
+   *
+   * A device that stays silent keeps the flag, and the pulse is refused as
+   * before. Nothing is sent to a device that has not just proven it is
+   * listening, so the property being protected is unchanged.
+   */
+  private async refreshIfStalled(ctx: PluginContext): Promise<void> {
+    if (!this.gate?.unreachable) return
+    try {
+      await this.readOnce(ctx)
+      this.onSuccess()
+    } catch {
+      this.onFailure()
+      return
+    }
+    if (!this.gate.unreachable) {
+      this.log.info(`${this.config.ip}: answered on re-check, so the command goes ahead`)
+    }
   }
 
   /** Also drop the gate's travel timer, which outlives the poll loop otherwise. */

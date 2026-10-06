@@ -481,6 +481,25 @@ describe('pulsing a gate whose last poll failed', () => {
     expect(setCalls).toHaveLength(0)
   })
 
+  it('does not pulse when the re-check shows the gate already arrived', async () => {
+    // The drift this guards: the gate was closed, the link stalled, and someone
+    // opened it with the remote during the gap. A re-check that only proved the
+    // device was alive would leave the controller still believing "closed", and
+    // the press meant to open the gate would close it instead. The re-check
+    // reads, so the fresh position is adopted before anything is computed.
+    const { ctx, device, controls } = await setupGate()
+    await device.poll(ctx)
+
+    offline = true
+    await device.poll(ctx)
+    openLimit = true
+    closedLimit = false
+    offline = false
+
+    await control(controls, 'target').handler('open')
+    expect(setCalls).toHaveLength(0)
+  })
+
   it('does not re-check when the device was answering all along', async () => {
     // The extra read is the cost of recovering from a stall, not something
     // every pulse pays.
