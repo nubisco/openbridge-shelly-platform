@@ -22,7 +22,7 @@ electrical power.
 - **Language**: TypeScript (strict mode, `strictNullChecks` and `strictFunctionTypes` off)
 - **Module system**: CommonJS (output to `dist/`)
 - **Target**: ES2022
-- **Runtime**: Node.js >= 20
+- **Runtime**: Node.js >= 22.23.4
 - **Config validation**: Zod (validates device config at plugin startup)
 - **Tests**: Vitest, in `tests/`
 
@@ -100,7 +100,7 @@ Build, then drive `ShellyEnergyDevice` directly with a stub context that records
 ## Release Process
 
 Semantic Release on push to `master`, from Conventional Commits. CI runs lint, build and test on
-Node 20 and 22 before the release job publishes to npm and GitHub.
+Node 22 and 24 before the release job publishes to npm and GitHub.
 
 ## Conventions
 

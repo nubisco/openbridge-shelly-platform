@@ -13,7 +13,7 @@ npm install -g @nubisco/openbridge-shelly-platform
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 22.23.4 or newer
 - OpenBridge with native plugin support
 - A Shelly energy meter reachable on your local network
 

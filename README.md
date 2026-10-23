@@ -3,7 +3,7 @@
 [![CI](https://github.com/nubisco/openbridge-shelly-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/nubisco/openbridge-shelly-platform/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@nubisco/openbridge-shelly-platform.svg)](https://www.npmjs.com/package/@nubisco/openbridge-shelly-platform)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
+[![node](https://img.shields.io/badge/node-%3E%3D22.23.4-brightgreen.svg)](https://nodejs.org)
 
 Shelly devices in [OpenBridge](https://github.com/nubisco/openbridge), read locally over your own
 network. Per-phase power, voltage, current and cumulative energy, with history charting.
