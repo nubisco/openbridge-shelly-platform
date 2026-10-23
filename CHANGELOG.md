@@ -1,3 +1,19 @@
+# [2.0.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.5...v2.0.0) (2026-10-23)
+
+
+* feat!: require Node.js 22.23.4 or newer ([6f80939](https://github.com/nubisco/openbridge-shelly-platform/commit/6f809392f3c26d4d5a07bdedae3e3de618a0079e))
+
+
+### BREAKING CHANGES
+
+* Node.js 20 is no longer supported. Node 20 reached end of
+life in April 2026 and gets no security fixes, so it stays exposed to the
+October 2026 Node.js security release (the Brotli remote code execution
+CVE-2026-111497 and the TLS hostname verification bypasses). Node 22
+releases before 22.23.4 are affected by the same release. Run OpenBridge on
+Node.js 22.23.4 or newer, or any Node 24 release, before updating this
+plugin.
+
 ## [1.6.5](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.4...v1.6.5) (2026-10-06)
 
 
