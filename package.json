@@ -47,9 +47,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "quality:check": "npm test && npm run lint && npm run format:check && npm run types:check",
-    "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs",
+    "docs:dev": "nubisco-docs dev docs",
+    "docs:build": "nubisco-docs build docs",
+    "docs:preview": "nubisco-docs preview docs",
     "prepare": "[ -n \"$CI\" ] || simple-git-hooks"
   },
   "simple-git-hooks": {
@@ -102,6 +102,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@nubisco/docs-sdk": "^0.1.5",
+    "@nubisco/ui": "^5.41.1",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@types/node": "^20.19.37",
@@ -115,7 +117,7 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.0.8",
-    "vitepress": "^1.6.4",
-    "vitest": "^4.1.1"
+    "vitest": "^4.1.1",
+    "vue": "^3.5.44"
   }
 }

@@ -1,6 +1,8 @@
-# Configuration
-
-Add the plugin under `plugins[]` in your OpenBridge config:
+---
+layout: nubisco
+title: 'Configuration'
+intro: 'Add the plugin under `plugins[]` in your OpenBridge config:'
+---
 
 ```json
 {

@@ -1,4 +1,7 @@
-# Troubleshooting
+---
+layout: nubisco
+title: 'Troubleshooting'
+---
 
 ## "is a GenN device, which speaks the /rpc/ API"
 

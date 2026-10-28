@@ -1,7 +1,8 @@
-# Contributing
-
-Contributions are welcome. See [CONTRIBUTING.md](https://github.com/nubisco/openbridge-shelly-platform/blob/master/CONTRIBUTING.md)
-for the full guide.
+---
+layout: nubisco
+title: 'Contributing'
+intro: 'Contributions are welcome. See [CONTRIBUTING.md](https://github.com/nubisco/openbridge-shelly-platform/blob/master/CONTRIBUTING.md) for the full guide.'
+---
 
 ## Local setup
 

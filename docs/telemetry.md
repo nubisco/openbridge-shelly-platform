@@ -1,6 +1,8 @@
-# Telemetry
-
-Each registered device reports the following keys on every poll.
+---
+layout: nubisco
+title: 'Telemetry'
+intro: 'Each registered device reports the following keys on every poll.'
+---
 
 | Key                   | Unit    | Meaning                                                                              |
 | --------------------- | ------- | ------------------------------------------------------------------------------------ |

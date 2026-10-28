@@ -1,4 +1,7 @@
-# Examples
+---
+layout: nubisco
+title: 'Examples'
+---
 
 ## Minimal
 

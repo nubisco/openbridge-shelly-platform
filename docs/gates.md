@@ -1,7 +1,8 @@
-# Gates
-
-A Gen2+ Shelly with one relay and two spare inputs can drive a gate, and the plugin will present
-it to OpenBridge and HomeKit as a gate rather than as a relay and two contact sensors.
+---
+layout: nubisco
+title: 'Gates'
+intro: 'A Gen2+ Shelly with one relay and two spare inputs can drive a gate, and the plugin will present it to OpenBridge and HomeKit as a gate rather than as a relay and two contact sensors.'
+---
 
 ```json
 {

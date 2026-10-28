@@ -1,4 +1,7 @@
-# Introduction
+---
+layout: nubisco
+title: 'Introduction'
+---
 
 `@nubisco/openbridge-shelly-platform` connects [Shelly](https://www.shelly.com/) devices to
 [OpenBridge](https://github.com/nubisco/openbridge) over your local network.

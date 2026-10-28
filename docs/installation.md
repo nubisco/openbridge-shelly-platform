@@ -1,4 +1,7 @@
-# Installation
+---
+layout: nubisco
+title: 'Installation'
+---
 
 ## From the OpenBridge marketplace
 

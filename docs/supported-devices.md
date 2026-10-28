@@ -1,4 +1,7 @@
-# Supported Devices
+---
+layout: nubisco
+title: 'Supported Devices'
+---
 
 ## Supported today
 
