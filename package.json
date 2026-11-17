@@ -6,7 +6,7 @@
     "type": "git",
     "url": "git+https://github.com/nubisco/openbridge-shelly-platform.git"
   },
-  "author": "José Silva <jose@nubisco.io>",
+  "author": "Nubisco",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
