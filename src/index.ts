@@ -1128,7 +1128,7 @@ const nativePlugin = definePlugin({
     name: PLUGIN_NAME,
     version: PLUGIN_VERSION,
     description: 'Shelly devices over the local network, with per-phase energy telemetry and history',
-    author: 'José Silva',
+    author: 'Nubisco',
   },
 
   async setup(ctx: PluginContext) {
