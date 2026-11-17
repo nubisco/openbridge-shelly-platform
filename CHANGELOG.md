@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/nubisco/openbridge-shelly-platform/compare/v2.0.0...v2.0.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* the package says it is by Nubisco, like the plugin card ([#6](https://github.com/nubisco/openbridge-shelly-platform/issues/6)) ([7a6e69a](https://github.com/nubisco/openbridge-shelly-platform/commit/7a6e69ae45e6aadb0a7935914cec0dbd1b21d904))
+
 # [2.0.0](https://github.com/nubisco/openbridge-shelly-platform/compare/v1.6.5...v2.0.0) (2026-10-23)
 
 
